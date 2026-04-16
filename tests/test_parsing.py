@@ -1,4 +1,16 @@
-from dspy_qwen35_adapter.parsing import strip_think
+import json
+from pathlib import Path
+
+import pytest
+
+from dspy_qwen35_adapter.parsing import (
+    coerce_args_to_schema,
+    extract_tool_call,
+    split_thought_and_call,
+    strip_think,
+)
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "traces"
 
 
 def test_strip_think_removes_balanced_block():
@@ -29,9 +41,6 @@ def test_strip_think_passthrough_when_no_tags():
 def test_strip_think_preserves_internal_whitespace():
     text = "<think>r</think>\n\nHello"
     assert strip_think(text) == "Hello"
-
-
-from dspy_qwen35_adapter.parsing import extract_tool_call
 
 
 def test_extract_tool_call_single_string_param():
@@ -80,9 +89,6 @@ def test_extract_tool_call_malformed_returns_none():
     assert extract_tool_call(text) is None
 
 
-from dspy_qwen35_adapter.parsing import split_thought_and_call
-
-
 def test_split_with_thought_before_call():
     text = (
         "I should check the weather.\n"
@@ -112,9 +118,6 @@ def test_split_strips_surrounding_whitespace_in_thought():
     assert thought == "reasoning"
 
 
-from dspy_qwen35_adapter.parsing import coerce_args_to_schema
-
-
 def test_coerce_string_to_int():
     schema = {"count": {"type": "integer"}}
     assert coerce_args_to_schema({"count": "5"}, schema) == {"count": 5}
@@ -141,19 +144,20 @@ def test_coerce_ignores_unknown_keys():
     assert coerce_args_to_schema({"b": "5"}, schema) == {"b": "5"}
 
 
-import json
-from pathlib import Path
-import pytest
-from dspy_qwen35_adapter.parsing import strip_think, split_thought_and_call
-
-FIXTURE_DIR = Path(__file__).parent / "fixtures" / "traces"
-
-
 def _fixture_pairs():
-    for txt_path in sorted(FIXTURE_DIR.glob("*.txt")):
-        json_path = txt_path.with_suffix(".json")
-        if json_path.exists():
-            yield pytest.param(txt_path, json_path, id=txt_path.stem)
+    txts = {p.stem for p in FIXTURE_DIR.glob("*.txt")}
+    jsons = {p.stem for p in FIXTURE_DIR.glob("*.json")}
+    orphans = txts.symmetric_difference(jsons)
+    if orphans:
+        raise RuntimeError(
+            f"Orphan fixture files (missing .txt or .json mate): {sorted(orphans)}"
+        )
+    for stem in sorted(txts):
+        yield pytest.param(
+            FIXTURE_DIR / f"{stem}.txt",
+            FIXTURE_DIR / f"{stem}.json",
+            id=stem,
+        )
 
 
 @pytest.mark.parametrize("txt_path,json_path", list(_fixture_pairs()))
