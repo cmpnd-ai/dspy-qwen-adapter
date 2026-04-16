@@ -1,12 +1,14 @@
 import re
 
-_BALANCED_THINK = re.compile(r"<think\b[^>]*>.*?</think>", re.DOTALL | re.IGNORECASE)
-_ORPHAN_CLOSER = re.compile(r"^.*?</think>", re.DOTALL | re.IGNORECASE)
-_UNCLOSED_OPENER = re.compile(r"<think\b[^>]*>.*\Z", re.DOTALL | re.IGNORECASE)
+_THINK_BLOCK = re.compile(r"<think>[\s\S]*?</think>")
+_ORPHAN_CLOSER = re.compile(r"^\s*</think>\s*")
+_UNCLOSED_THINK = re.compile(r"<think>[\s\S]*$")
 
 
 def strip_think(text: str) -> str:
-    text = _BALANCED_THINK.sub("", text)
-    text = _ORPHAN_CLOSER.sub("", text, count=1)
-    text = _UNCLOSED_OPENER.sub("", text)
+    """Remove <think>...</think> blocks, orphan </think> openers, and
+    unclosed <think> tails. Whitespace around removed regions is trimmed."""
+    text = _ORPHAN_CLOSER.sub("", text)
+    text = _THINK_BLOCK.sub("", text)
+    text = _UNCLOSED_THINK.sub("", text)
     return text.strip()
