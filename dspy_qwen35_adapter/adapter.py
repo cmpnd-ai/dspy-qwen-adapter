@@ -11,6 +11,7 @@ from dspy_qwen35_adapter.parsing import (
     split_thought_and_call,
     coerce_args_to_schema,
 )
+from dspy_qwen35_adapter.prompts import build_system_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +70,67 @@ class Qwen35Adapter(Adapter):
         # Non-ReAct signatures fall through to the XML/delimiter fallback
         # added in Task 10. For now, return thought as best-effort.
         return {list(signature.output_fields.keys())[0]: cleaned}
+
+    def format_field_description(self, signature: type[Signature]) -> str:
+        return signature.instructions or ""
+
+    def format_field_structure(self, signature: type[Signature]) -> str:
+        return (
+            "When calling a tool, emit exactly one <function=NAME>"
+            "<parameter=KEY>VALUE</parameter>...</function>. "
+            "Otherwise respond in plain text."
+        )
+
+    def format_task_description(self, signature: type[Signature]) -> str:
+        return signature.instructions or ""
+
+    def format_user_message_content(
+        self,
+        signature: type[Signature],
+        inputs: dict[str, Any],
+        prefix: str = "",
+        suffix: str = "",
+        main_request: bool = False,
+    ) -> str:
+        parts = []
+        for name, _field in signature.input_fields.items():
+            if name == "tools":
+                continue
+            value = inputs.get(name, "")
+            parts.append(f"{name}: {value}")
+        return (prefix + "\n\n".join(parts) + suffix).strip()
+
+    def format_assistant_message_content(
+        self,
+        signature: type[Signature],
+        outputs: dict[str, Any],
+        missing_field_message: str | None = None,
+    ) -> str:
+        has_react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
+        if has_react_fields:
+            thought = outputs.get("next_thought", "")
+            name = outputs.get("next_tool_name", "")
+            args = outputs.get("next_tool_args", {}) or {}
+            params = "".join(
+                f"<parameter={k}>{v}</parameter>" for k, v in args.items()
+            )
+            return f"{thought}\n<function={name}>{params}</function>".strip()
+        return "\n".join(f"{k}: {v}" for k, v in outputs.items())
+
+    def format(
+        self,
+        signature: type[Signature],
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        tools = inputs.get("tools") or []
+        tool_list = tools if isinstance(tools, list) else [tools]
+        system = build_system_prompt(
+            task_description=signature.instructions or "",
+            tools=tool_list,
+        )
+        user = self.format_user_message_content(signature, inputs)
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
