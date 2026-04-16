@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+harness/results/*.csv
+harness/traces/*.txt
+!harness/results/.gitkeep
+!harness/traces/.gitkeep

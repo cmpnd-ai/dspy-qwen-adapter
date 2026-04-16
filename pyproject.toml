@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dspy-qwen35-adapter"
+version = "0.1.0"
+description = "DSPy adapter for Qwen 3.5 tool calling on OpenAI-compatible local servers"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "dspy>=2.5",
+    "json-repair>=0.25",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["dspy_qwen35_adapter"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["tests/", "harness/", "docs/", "dspy/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
