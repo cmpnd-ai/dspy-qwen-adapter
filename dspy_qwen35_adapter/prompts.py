@@ -6,23 +6,41 @@ from dspy.adapters.types.tool import Tool
 
 _EXEMPLAR = (
     "Example of a tool call:\n"
-    "<function=example_tool>"
-    "<parameter=arg1>value1</parameter>"
-    "<parameter=arg2>value2</parameter>"
-    "</function>"
+    "<tool_call>\n"
+    "<function=example_tool>\n"
+    "<parameter=arg1>\n"
+    "value1\n"
+    "</parameter>\n"
+    "<parameter=arg2>\n"
+    "value2\n"
+    "</parameter>\n"
+    "</function>\n"
+    "</tool_call>"
 )
 
 
 _REACT_GUIDANCE = (
     "You are an agent. Use the supplied tools to answer the user's question. "
     "On each turn, write plain-text reasoning on one or more lines, then emit "
-    "exactly one tool call in this form on its own line:\n"
-    "  <function=TOOL_NAME><parameter=KEY>VALUE</parameter>...</function>\n"
-    "Emit nothing after the closing </function>. When you have enough "
-    "information to answer, call <function=finish></function>.\n"
+    "exactly one tool call in this canonical Qwen format:\n"
+    "<tool_call>\n"
+    "<function=TOOL_NAME>\n"
+    "<parameter=KEY>\n"
+    "VALUE\n"
+    "</parameter>\n"
+    "</function>\n"
+    "</tool_call>\n"
+    "Emit nothing after the closing </tool_call>. When you have enough "
+    "information to answer, call <tool_call><function=finish></function></tool_call>.\n"
     "Example of a correct turn:\n"
     "I need to check Tokyo's weather.\n"
-    "<function=get_weather><parameter=city>Tokyo</parameter></function>"
+    "<tool_call>\n"
+    "<function=get_weather>\n"
+    "<parameter=city>\n"
+    "Tokyo\n"
+    "</parameter>\n"
+    "</function>\n"
+    "</tool_call>"
 )
 
 

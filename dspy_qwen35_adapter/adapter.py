@@ -44,6 +44,60 @@ def _scrub_react_format_directives(instructions: str) -> str:
     )
 
 
+_TRAJECTORY_PREFIXES = ("thought_", "tool_name_", "tool_args_", "observation_")
+
+
+def _render_tool_call(name: str, args: dict[str, Any]) -> str:
+    """Render a (tool_name, args) pair in Qwen 3.5's canonical chat-template
+    XML format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>
+    ...</function></tool_call> with values on their own lines.
+
+    Mirrors the tokenizer_config.json chat_template for Qwen 3.5 (and the
+    Qwen3-Coder lineage it inherits from)."""
+    params = "".join(
+        f"<parameter={k}>\n{v}\n</parameter>\n" for k, v in args.items()
+    )
+    return f"<tool_call>\n<function={name}>\n{params}</function>\n</tool_call>"
+
+
+def _is_react_trajectory(inputs: dict[str, Any]) -> bool:
+    """True when the inputs dict looks like a ReAct trajectory (keys of the
+    form thought_N / tool_name_N / tool_args_N / observation_N). ReAct's
+    _format_trajectory passes the trajectory dict here to get a text blob
+    for the next turn's user message."""
+    if not inputs:
+        return False
+    return any(str(k).startswith(_TRAJECTORY_PREFIXES) for k in inputs)
+
+
+def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
+    """Render a ReAct trajectory as a Qwen-native transcript: each turn's
+    reasoning as plain text, the tool call in canonical XML, and the
+    observation wrapped in <tool_response>.
+
+    Turns are grouped by the integer suffix on the keys (thought_0,
+    tool_name_0, etc.). Missing pieces of a turn are silently skipped."""
+    turn_idxs: list[int] = sorted({
+        int(k.rsplit("_", 1)[1])
+        for k in trajectory
+        if str(k).startswith(_TRAJECTORY_PREFIXES)
+        and k.rsplit("_", 1)[1].isdigit()
+    })
+    parts: list[str] = []
+    for i in turn_idxs:
+        thought = trajectory.get(f"thought_{i}", "")
+        name = trajectory.get(f"tool_name_{i}", "")
+        args = trajectory.get(f"tool_args_{i}", {}) or {}
+        obs = trajectory.get(f"observation_{i}", None)
+        if thought:
+            parts.append(str(thought).strip())
+        if name:
+            parts.append(_render_tool_call(name, args))
+        if obs is not None:
+            parts.append(f"<tool_response>\n{obs}\n</tool_response>")
+    return "\n".join(parts)
+
+
 class Qwen35Adapter(Adapter):
     """Text-native DSPy adapter for Qwen 3.5 tool calling.
 
@@ -107,9 +161,9 @@ class Qwen35Adapter(Adapter):
 
     def format_field_structure(self, signature: type[Signature]) -> str:
         return (
-            "When calling a tool, emit exactly one <function=NAME>"
-            "<parameter=KEY>VALUE</parameter>...</function>. "
-            "Otherwise respond in plain text."
+            "When calling a tool, emit a canonical Qwen tool call: "
+            "<tool_call><function=NAME><parameter=KEY>VALUE</parameter>..."
+            "</function></tool_call>. Otherwise respond in plain text."
         )
 
     def format_task_description(self, signature: type[Signature]) -> str:
@@ -123,6 +177,14 @@ class Qwen35Adapter(Adapter):
         suffix: str = "",
         main_request: bool = False,
     ) -> str:
+        # ReAct calls format_user_message_content(trajectory_signature, trajectory)
+        # to render the past trajectory as text to feed back to the model.
+        # When we detect that pattern, render in Qwen's canonical chat-template
+        # format: <tool_call>...</tool_call> + <tool_response>...</tool_response>.
+        if _is_react_trajectory(inputs):
+            rendered = _render_react_trajectory(inputs)
+            return (prefix + rendered + suffix).strip()
+
         parts = []
         for name, _field in signature.input_fields.items():
             if name == "tools":
@@ -142,10 +204,10 @@ class Qwen35Adapter(Adapter):
             thought = outputs.get("next_thought", "")
             name = outputs.get("next_tool_name", "")
             args = outputs.get("next_tool_args", {}) or {}
-            params = "".join(
-                f"<parameter={k}>{v}</parameter>" for k, v in args.items()
-            )
-            return f"{thought}\n<function={name}>{params}</function>".strip()
+            call_xml = _render_tool_call(name, args)
+            if thought:
+                return f"{thought}\n{call_xml}"
+            return call_xml
         return "\n".join(f"{k}: {v}" for k, v in outputs.items())
 
     def format(

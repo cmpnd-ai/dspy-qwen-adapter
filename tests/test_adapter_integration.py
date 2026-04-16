@@ -86,8 +86,11 @@ def test_format_assistant_message_replays_qwen_xml():
             "next_tool_args": {"city": "Tokyo"},
         },
     )
+    assert "<tool_call>" in content
     assert "<function=get_weather>" in content
-    assert "<parameter=city>Tokyo</parameter>" in content
+    assert "</tool_call>" in content
+    # Canonical Qwen 3.5 format puts the parameter value on its own lines.
+    assert "<parameter=city>\nTokyo\n</parameter>" in content
     assert "check weather" in content
 
 
@@ -182,3 +185,58 @@ def test_format_react_signature_emits_xml_protocol_and_drops_json_directive():
     assert "<parameter=" in system
     # The JSON directive from signature.instructions must NOT leak through.
     assert "JSON" not in system and "json" not in system
+
+
+def test_format_assistant_tool_call_is_canonical_qwen_35():
+    """The replayed assistant turn must match Qwen 3.5's trained chat_template
+    format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>...
+    </function></tool_call>."""
+    a = Qwen35Adapter()
+    sig = _sample_signature_with_tools()
+    content = a.format_assistant_message_content(
+        sig,
+        outputs={
+            "next_thought": "",
+            "next_tool_name": "search",
+            "next_tool_args": {"query": "weather", "limit": 5},
+        },
+    )
+    assert content == (
+        "<tool_call>\n"
+        "<function=search>\n"
+        "<parameter=query>\nweather\n</parameter>\n"
+        "<parameter=limit>\n5\n</parameter>\n"
+        "</function>\n"
+        "</tool_call>"
+    )
+
+
+def test_format_trajectory_renders_qwen_native_transcript():
+    """When format_user_message_content is called with a trajectory-shaped
+    input dict (ReAct's replay path), the output must be a Qwen-native
+    transcript: reasoning as prose, tool calls in canonical XML, observations
+    wrapped in <tool_response>."""
+    a = Qwen35Adapter()
+
+    trajectory = {
+        "thought_0": "I should check the weather.",
+        "tool_name_0": "get_weather",
+        "tool_args_0": {"city": "Tokyo"},
+        "observation_0": "sunny, 72F",
+        "thought_1": "Got it. Done.",
+        "tool_name_1": "finish",
+        "tool_args_1": {},
+        "observation_1": "Completed.",
+    }
+    sig = dspy.Signature(f"{', '.join(trajectory)} -> x")
+    rendered = a.format_user_message_content(sig, trajectory)
+
+    assert "<tool_call>\n<function=get_weather>" in rendered
+    assert "<parameter=city>\nTokyo\n</parameter>" in rendered
+    assert "<tool_response>\nsunny, 72F\n</tool_response>" in rendered
+    assert "<tool_call>\n<function=finish>\n</function>\n</tool_call>" in rendered
+    # Non-trajectory path is unchanged: plain "name: value" lines.
+    class Plain(dspy.Signature):
+        question: str = dspy.InputField()
+        answer: str = dspy.OutputField()
+    assert a.format_user_message_content(Plain, {"question": "hi"}) == "question: hi"
