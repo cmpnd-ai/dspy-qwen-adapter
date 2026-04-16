@@ -244,25 +244,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--model",
-        default=os.environ.get("QWEN_MODEL", "openai/qwen3.5-35b-a3b"),
-        help="LM model id (default: $QWEN_MODEL or openai/qwen3.5-35b-a3b).",
+        default=os.environ.get("QWEN_MODEL", "openai/qwen/qwen3.5-35b-a3b"),
+        help="LM model id (default: $QWEN_MODEL or openai/qwen/qwen3.5-35b-a3b).",
     )
     p.add_argument(
         "--api-base",
-        default=os.environ.get("LMSTUDIO_BASE", "http://localhost:1234/v1"),
+        default=os.environ.get("LMSTUDIO_BASE", "http://127.0.0.1:1234/v1"),
         help="OpenAI-compatible API base URL.",
     )
     p.add_argument(
         "--temperature",
         type=float,
-        default=0.0,
-        help="LM sampling temperature (default 0.0).",
+        default=1.0,
+        help="LM sampling temperature (default 1.0).",
     )
     p.add_argument(
         "--max-tokens",
         type=int,
-        default=1024,
-        help="LM max_tokens per call (default 1024).",
+        default=8192,
+        help="LM max_tokens per call (default 8192).",
     )
     p.add_argument(
         "--output",
