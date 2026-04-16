@@ -89,3 +89,20 @@ def test_format_assistant_message_replays_qwen_xml():
     assert "<function=get_weather>" in content
     assert "<parameter=city>Tokyo</parameter>" in content
     assert "check weather" in content
+
+
+def test_strict_parse_raises_when_no_call():
+    from dspy.utils.exceptions import AdapterParseError
+    a = Qwen35Adapter(strict_parse=True)
+    sig = _sample_signature_with_tools()
+    with pytest.raises(AdapterParseError):
+        a.parse(sig, "Just some plain text")
+
+
+def test_non_strict_returns_finish_when_no_call():
+    a = Qwen35Adapter(strict_parse=False)
+    sig = _sample_signature_with_tools()
+    out = a.parse(sig, "Plain answer")
+    assert out["next_tool_name"] == "finish"
+    assert out["next_thought"] == "Plain answer"
+    assert out["next_tool_args"] == {}
