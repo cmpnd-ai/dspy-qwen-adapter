@@ -106,3 +106,36 @@ def test_non_strict_returns_finish_when_no_call():
     assert out["next_tool_name"] == "finish"
     assert out["next_thought"] == "Plain answer"
     assert out["next_tool_args"] == {}
+
+
+def test_react_completes_with_qwen_adapter_and_dummy_lm():
+    """Run a full ReAct loop against DummyLM using Qwen35Adapter.
+    Verifies format+parse round-trip without any network."""
+    from dspy.utils.dummies import DummyLM
+
+    def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return f"Weather in {city}: sunny, 72F."
+
+    lm = DummyLM(
+        [
+            # Turn 1: call get_weather
+            {"response": (
+                "I'll check Tokyo's weather.\n"
+                "<function=get_weather><parameter=city>Tokyo</parameter></function>"
+            )},
+            # Turn 2: finish
+            {"response": "I have the answer.\n<function=finish></function>"},
+            # Extract turn: final answer as plain text
+            {"response": "Tokyo is sunny and 72F."},
+        ]
+    )
+
+    with dspy.context(lm=lm, adapter=Qwen35Adapter()):
+        react = dspy.ReAct("question -> answer", tools=[get_weather])
+        pred = react(question="What's the weather in Tokyo?")
+
+    assert pred.trajectory["tool_name_0"] == "get_weather"
+    assert pred.trajectory["tool_args_0"] == {"city": "Tokyo"}
+    assert "sunny" in pred.trajectory["observation_0"]
+    assert pred.trajectory["tool_name_1"] == "finish"
