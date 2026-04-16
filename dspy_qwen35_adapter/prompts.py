@@ -1,4 +1,5 @@
 import json
+from xml.sax.saxutils import escape, quoteattr
 from typing import Iterable
 from dspy.adapters.types.tool import Tool
 
@@ -15,10 +16,10 @@ _EXEMPLAR = (
 def _tool_to_xml(tool: Tool) -> str:
     schema = tool.args or {}
     return (
-        f'  <tool name="{tool.name}">\n'
-        f'    <description>{tool.desc or ""}</description>\n'
-        f'    <parameters>{json.dumps(schema)}</parameters>\n'
-        f'  </tool>'
+        f"  <tool name={quoteattr(tool.name)}>\n"
+        f"    <description>{escape(tool.desc or '')}</description>\n"
+        f"    <parameters>{json.dumps(schema)}</parameters>\n"
+        f"  </tool>"
     )
 
 
