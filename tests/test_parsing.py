@@ -110,3 +110,32 @@ def test_split_strips_surrounding_whitespace_in_thought():
     text = "\n\n  reasoning  \n<function=f></function>"
     thought, _ = split_thought_and_call(text)
     assert thought == "reasoning"
+
+
+from dspy_qwen35_adapter.parsing import coerce_args_to_schema
+
+
+def test_coerce_string_to_int():
+    schema = {"count": {"type": "integer"}}
+    assert coerce_args_to_schema({"count": "5"}, schema) == {"count": 5}
+
+
+def test_coerce_string_to_float():
+    schema = {"ratio": {"type": "number"}}
+    assert coerce_args_to_schema({"ratio": "1.5"}, schema) == {"ratio": 1.5}
+
+
+def test_coerce_string_to_bool():
+    schema = {"enabled": {"type": "boolean"}}
+    assert coerce_args_to_schema({"enabled": "true"}, schema) == {"enabled": True}
+    assert coerce_args_to_schema({"enabled": "false"}, schema) == {"enabled": False}
+
+
+def test_coerce_passes_through_on_failure():
+    schema = {"count": {"type": "integer"}}
+    assert coerce_args_to_schema({"count": "not a number"}, schema) == {"count": "not a number"}
+
+
+def test_coerce_ignores_unknown_keys():
+    schema = {"a": {"type": "integer"}}
+    assert coerce_args_to_schema({"b": "5"}, schema) == {"b": "5"}

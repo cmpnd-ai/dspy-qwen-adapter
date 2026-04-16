@@ -58,3 +58,29 @@ def split_thought_and_call(
     for p in _PARAMETER_BLOCK.finditer(fn_match.group(2)):
         args[p.group(1)] = _decode_value(p.group(2))
     return thought, (name, args)
+
+
+def coerce_args_to_schema(
+    args: dict[str, Any], schema: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Best-effort coerce string args to integer/number/boolean per a simple
+    JSON-schema-like map. Leaves values unchanged on any failure or when no
+    type hint is present."""
+    out = dict(args)
+    for key, value in args.items():
+        spec = schema.get(key)
+        if not spec or not isinstance(value, str):
+            continue
+        kind = spec.get("type")
+        try:
+            if kind == "integer":
+                out[key] = int(value)
+            elif kind == "number":
+                out[key] = float(value)
+            elif kind == "boolean":
+                lowered = value.strip().lower()
+                if lowered in {"true", "false"}:
+                    out[key] = lowered == "true"
+        except (ValueError, TypeError):
+            pass
+    return out
