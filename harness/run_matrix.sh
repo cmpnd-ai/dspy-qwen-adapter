@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Run the full adapter × scenario matrix against a local LM Studio endpoint.
+# Run the adapter × scenario matrix against a local LM Studio endpoint.
 #
 # Usage:
-#   ./harness/run_matrix.sh                    # default: 20 runs per cell
-#   ./harness/run_matrix.sh --runs 5           # smaller sample
-#   ./harness/run_matrix.sh --runs 1 --no-capture   # quickest smoke
+#   ./harness/run_matrix.sh                                # full: all 3 adapters, 20 runs
+#   ./harness/run_matrix.sh --runs 5                       # smaller sample
+#   ./harness/run_matrix.sh --runs 1 --no-capture          # quickest smoke
+#   ./harness/run_matrix.sh --adapters json,qwen35         # skip chat (already proven)
+#   ./harness/run_matrix.sh --scenarios s3,s10             # skip s1
 #
 # Must be run from the repo root with .venv activated or discoverable.
 
@@ -13,13 +15,17 @@ set -euo pipefail
 RUNS=20
 CAPTURE="--capture-traces"
 API_BASE="${LMSTUDIO_BASE:-http://127.0.0.1:1234/v1}"
+ADAPTERS_ARG="chat,json,qwen35"
+SCENARIOS_ARG="s1,s3,s10"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --runs) RUNS="$2"; shift 2 ;;
     --no-capture) CAPTURE=""; shift ;;
+    --adapters) ADAPTERS_ARG="$2"; shift 2 ;;
+    --scenarios) SCENARIOS_ARG="$2"; shift 2 ;;
     -h|--help)
-      sed -n '2,10p' "$0" | sed 's/^# \?//'
+      sed -n '2,11p' "$0" | sed 's/^# \?//'
       exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -39,8 +45,8 @@ if ! curl -s --max-time 3 "${API_BASE}/models" | grep -q '"id"'; then
   exit 1
 fi
 
-ADAPTERS=(chat json qwen35)
-SCENARIOS=(s1 s3 s10)
+IFS=',' read -ra ADAPTERS <<< "${ADAPTERS_ARG}"
+IFS=',' read -ra SCENARIOS <<< "${SCENARIOS_ARG}"
 TOTAL=$(( ${#ADAPTERS[@]} * ${#SCENARIOS[@]} ))
 CELL=0
 START=$(date +%s)

@@ -44,12 +44,27 @@ CSV_FIELDS = [
 
 # -------- Adapter construction --------
 
+class _LMStudioJSONAdapter(dspy.JSONAdapter):
+    """JSONAdapter variant compatible with LM Studio.
+
+    Stock JSONAdapter injects `response_format={"type": "json_object"}` on
+    every request. LM Studio's OpenAI endpoint rejects that with
+    `'response_format.type' must be 'json_schema' or 'text'`. Overriding the
+    early-return hook so we never inject `response_format`; the adapter still
+    formats prompts as JSON and parses JSON from text — a fair comparison
+    point against servers that don't support structured outputs.
+    """
+
+    def _json_adapter_call_common(self, lm, lm_kwargs, signature, demos, inputs, call_fn):
+        return call_fn(lm, lm_kwargs, signature, demos, inputs)
+
+
 def build_adapter(name: str):
     """Instantiate a fresh adapter by short name."""
     if name == "chat":
         return dspy.ChatAdapter()
     if name == "json":
-        return dspy.JSONAdapter()
+        return _LMStudioJSONAdapter()
     if name == "qwen35":
         return Qwen35Adapter()
     raise ValueError(f"unknown adapter: {name}")
