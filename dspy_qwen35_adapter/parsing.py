@@ -1,4 +1,6 @@
+import json
 import re
+from typing import Any
 
 _THINK_BLOCK = re.compile(r"<think>[\s\S]*?</think>")
 _ORPHAN_CLOSER = re.compile(r"^\s*</think>\s*")
@@ -12,10 +14,6 @@ def strip_think(text: str) -> str:
     text = _THINK_BLOCK.sub("", text)
     text = _UNCLOSED_THINK.sub("", text)
     return text.strip()
-
-
-import json
-from typing import Any
 
 
 _FUNCTION_BLOCK = re.compile(r"<function=(\S+?)>([\s\S]*?)</function>")
