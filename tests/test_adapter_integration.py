@@ -155,3 +155,29 @@ def test_parse_non_react_populates_last_output_field():
     out = a.parse(Sig, "Tokyo is sunny and 72F.")
     assert out["answer"] == "Tokyo is sunny and 72F."
     assert out["reasoning"] == ""
+
+
+def test_format_react_signature_includes_react_field_mapping():
+    """Qwen35Adapter.format() must emit react-mode guidance when the signature
+    has ReAct's three output fields."""
+    a = Qwen35Adapter()
+    sig = _sample_signature_with_tools()
+
+    def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return "sunny"
+
+    messages = a.format(
+        signature=sig,
+        demos=[],
+        inputs={
+            "question": "What's in Tokyo?",
+            "tools": [Tool(get_weather)],
+            "trajectory": "",
+        },
+    )
+    system = next(m for m in messages if m["role"] == "system")["content"]
+    # React field names must appear in the prompt with the XML mapping
+    assert "next_thought" in system
+    assert "next_tool_name" in system
+    assert "<function=" in system

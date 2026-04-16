@@ -130,9 +130,11 @@ class Qwen35Adapter(Adapter):
     ) -> list[dict[str, Any]]:
         tools = inputs.get("tools") or []
         tool_list = tools if isinstance(tools, list) else [tools]
+        react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
         system = build_system_prompt(
             task_description=signature.instructions or "",
             tools=tool_list,
+            react_fields=react_fields,
         )
         user = self.format_user_message_content(signature, inputs)
         return [
