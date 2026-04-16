@@ -42,3 +42,19 @@ def extract_tool_call(text: str) -> tuple[str, dict[str, Any]] | None:
     for p in _PARAMETER_BLOCK.finditer(body):
         args[p.group(1)] = _decode_value(p.group(2))
     return name, args
+
+
+def split_thought_and_call(
+    text: str,
+) -> tuple[str, tuple[str, dict[str, Any]] | None]:
+    """Split content into (thought, tool_call). Thought is text before the
+    first <function=...> tag; tool_call is the first parsed function block."""
+    fn_match = _FUNCTION_BLOCK.search(text)
+    if not fn_match:
+        return text.strip(), None
+    thought = text[: fn_match.start()].strip()
+    name = fn_match.group(1)
+    args: dict[str, Any] = {}
+    for p in _PARAMETER_BLOCK.finditer(fn_match.group(2)):
+        args[p.group(1)] = _decode_value(p.group(2))
+    return thought, (name, args)

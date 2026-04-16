@@ -78,3 +78,35 @@ def test_extract_tool_call_takes_first_when_multiple():
 def test_extract_tool_call_malformed_returns_none():
     text = "<function=broken><parameter=x>unclosed"
     assert extract_tool_call(text) is None
+
+
+from dspy_qwen35_adapter.parsing import split_thought_and_call
+
+
+def test_split_with_thought_before_call():
+    text = (
+        "I should check the weather.\n"
+        "<function=get_weather><parameter=city>Tokyo</parameter></function>"
+    )
+    thought, call = split_thought_and_call(text)
+    assert thought == "I should check the weather."
+    assert call == ("get_weather", {"city": "Tokyo"})
+
+
+def test_split_with_no_call():
+    thought, call = split_thought_and_call("Just a plain answer.")
+    assert thought == "Just a plain answer."
+    assert call is None
+
+
+def test_split_with_call_only_no_thought():
+    text = "<function=finish></function>"
+    thought, call = split_thought_and_call(text)
+    assert thought == ""
+    assert call == ("finish", {})
+
+
+def test_split_strips_surrounding_whitespace_in_thought():
+    text = "\n\n  reasoning  \n<function=f></function>"
+    thought, _ = split_thought_and_call(text)
+    assert thought == "reasoning"
