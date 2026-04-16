@@ -16,7 +16,7 @@ RUNS=20
 CAPTURE="--capture-traces"
 API_BASE="${LMSTUDIO_BASE:-http://127.0.0.1:1234/v1}"
 ADAPTERS_ARG="chat,json,qwen35"
-SCENARIOS_ARG="s1,s3,s10"
+SCENARIOS_ARG="s1,s3,s10,s_sql,s_code,s_echo,s_deep,s_i18n"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
