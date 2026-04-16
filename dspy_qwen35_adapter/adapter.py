@@ -67,9 +67,14 @@ class Qwen35Adapter(Adapter):
                 "next_tool_args": args,
             }
 
-        # Non-ReAct signatures fall through to the XML/delimiter fallback
-        # added in Task 10. For now, return thought as best-effort.
-        return {list(signature.output_fields.keys())[0]: cleaned}
+        # Non-ReAct signatures: best-effort plain-text → last output field.
+        # ChainOfThought prepends 'reasoning'; user's real answer is last.
+        output_keys = list(signature.output_fields.keys())
+        if not output_keys:
+            return {}
+        result = {k: "" for k in output_keys}
+        result[output_keys[-1]] = cleaned
+        return result
 
     def format_field_description(self, signature: type[Signature]) -> str:
         return signature.instructions or ""

@@ -139,3 +139,19 @@ def test_react_completes_with_qwen_adapter_and_dummy_lm():
     assert pred.trajectory["tool_args_0"] == {"city": "Tokyo"}
     assert "sunny" in pred.trajectory["observation_0"]
     assert pred.trajectory["tool_name_1"] == "finish"
+
+
+def test_parse_non_react_populates_last_output_field():
+    """Non-ReAct signatures (e.g., ChainOfThought extract) should put cleaned
+    content into the last output field — typically the user's declared answer,
+    not the ChainOfThought-prepended reasoning."""
+    class Sig(dspy.Signature):
+        """Answer the question."""
+        question: str = dspy.InputField()
+        reasoning: str = dspy.OutputField()
+        answer: str = dspy.OutputField()
+
+    a = Qwen35Adapter()
+    out = a.parse(Sig, "Tokyo is sunny and 72F.")
+    assert out["answer"] == "Tokyo is sunny and 72F."
+    assert out["reasoning"] == ""

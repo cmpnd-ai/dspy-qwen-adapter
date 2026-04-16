@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 dependencies = [
-    "dspy>=2.5",
+    "dspy>=3.1",
     "json-repair>=0.25",
 ]
 
