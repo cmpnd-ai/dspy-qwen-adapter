@@ -1,0 +1,2 @@
+Running the job.
+<function=run><parameter=config>{"retries": 3, "verbose": true}</parameter></function>

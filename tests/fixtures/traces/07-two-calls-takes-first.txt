@@ -1,0 +1,3 @@
+First I'll check weather.
+<function=get_weather><parameter=city>Tokyo</parameter></function>
+<function=get_weather><parameter=city>Paris</parameter></function>

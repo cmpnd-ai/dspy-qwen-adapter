@@ -139,3 +139,33 @@ def test_coerce_passes_through_on_failure():
 def test_coerce_ignores_unknown_keys():
     schema = {"a": {"type": "integer"}}
     assert coerce_args_to_schema({"b": "5"}, schema) == {"b": "5"}
+
+
+import json
+from pathlib import Path
+import pytest
+from dspy_qwen35_adapter.parsing import strip_think, split_thought_and_call
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "traces"
+
+
+def _fixture_pairs():
+    for txt_path in sorted(FIXTURE_DIR.glob("*.txt")):
+        json_path = txt_path.with_suffix(".json")
+        if json_path.exists():
+            yield pytest.param(txt_path, json_path, id=txt_path.stem)
+
+
+@pytest.mark.parametrize("txt_path,json_path", list(_fixture_pairs()))
+def test_fixture_parses_to_expected(txt_path, json_path):
+    raw = txt_path.read_text()
+    expected = json.loads(json_path.read_text())
+    cleaned = strip_think(raw)
+    thought, call = split_thought_and_call(cleaned)
+    assert thought == expected["thought"]
+    if expected.get("tool_name") is None:
+        assert call is None
+    else:
+        assert call is not None
+        assert call[0] == expected["tool_name"]
+        assert call[1] == expected["tool_args"]

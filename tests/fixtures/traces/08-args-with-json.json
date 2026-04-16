@@ -1,0 +1,1 @@
+{"thought": "Running the job.", "tool_name": "run", "tool_args": {"config": {"retries": 3, "verbose": true}}}

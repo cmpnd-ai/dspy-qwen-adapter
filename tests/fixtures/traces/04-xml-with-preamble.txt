@@ -1,0 +1,2 @@
+Let me call the weather tool now.
+<function=get_weather><parameter=city>Paris</parameter></function>

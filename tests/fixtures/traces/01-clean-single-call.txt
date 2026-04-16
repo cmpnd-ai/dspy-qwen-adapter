@@ -1,0 +1,2 @@
+I'll check the weather for Tokyo.
+<function=get_weather><parameter=city>Tokyo</parameter></function>

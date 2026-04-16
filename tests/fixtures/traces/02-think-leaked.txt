@@ -1,0 +1,3 @@
+<think>The user wants the weather. I should call get_weather.</think>
+I'll look up Tokyo's weather.
+<function=get_weather><parameter=city>Tokyo</parameter></function>

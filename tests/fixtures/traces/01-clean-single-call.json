@@ -1,0 +1,1 @@
+{"thought": "I'll check the weather for Tokyo.", "tool_name": "get_weather", "tool_args": {"city": "Tokyo"}}
