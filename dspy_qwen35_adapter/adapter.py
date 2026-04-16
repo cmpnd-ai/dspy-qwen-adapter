@@ -17,6 +17,32 @@ logger = logging.getLogger(__name__)
 
 REACT_TOOL_FIELDS = {"next_thought", "next_tool_name", "next_tool_args"}
 
+# Phrases in ReAct's auto-generated signature.instructions that push the model
+# toward the wrong output format for this adapter. We strip lines containing
+# any of these before prepending the instructions to our Qwen-native system
+# prompt. Other ReAct framing (agent role, goal, tool enumeration) is kept.
+_REACT_OUTPUT_FORMAT_CUES = (
+    "JSON", "json",
+    "next_thought", "next_tool_name", "next_tool_args",
+)
+
+
+def _scrub_react_format_directives(instructions: str) -> str:
+    """Remove lines that reference ReAct's field-named output protocol.
+
+    ReAct's generated instructions tell the model to "interleave next_thought,
+    next_tool_name, and next_tool_args" and to format args "in JSON format".
+    Qwen anchors on those cues and produces JSON or pseudo-YAML. Dropping
+    those lines lets our _REACT_GUIDANCE (appended later in the system
+    prompt by build_system_prompt) be the sole authority on output format.
+    """
+    if not instructions:
+        return ""
+    return "\n".join(
+        ln for ln in instructions.splitlines()
+        if not any(cue in ln for cue in _REACT_OUTPUT_FORMAT_CUES)
+    )
+
 
 class Qwen35Adapter(Adapter):
     """Text-native DSPy adapter for Qwen 3.5 tool calling.
@@ -131,8 +157,11 @@ class Qwen35Adapter(Adapter):
         tools = inputs.get("tools") or []
         tool_list = tools if isinstance(tools, list) else [tools]
         react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
+        task_description = _scrub_react_format_directives(
+            signature.instructions or ""
+        ) if react_fields else (signature.instructions or "")
         system = build_system_prompt(
-            task_description=signature.instructions or "",
+            task_description=task_description,
             tools=tool_list,
             react_fields=react_fields,
         )

@@ -65,19 +65,32 @@ def test_prompt_escapes_hostile_description():
     assert "&lt;/tool&gt;" in prompt
 
 
-def test_prompt_react_mode_maps_fields_to_xml():
-    """When react_fields=True, prompt must tell the model how to express
-    next_thought/next_tool_name/next_tool_args in Qwen XML, NOT as JSON."""
+def test_prompt_react_mode_emits_xml_protocol_guidance():
+    """When react_fields=True, the prompt must describe the Qwen XML turn
+    format (plain-text reasoning + single <function=...> call) and include
+    the <tools> block."""
     prompt = build_system_prompt(
         "Answer the question.",
         [_weather_tool()],
         react_fields=True,
     )
-    assert "next_thought" in prompt
-    assert "next_tool_name" in prompt
-    assert "next_tool_args" in prompt
-    # The prompt must instruct AGAINST JSON output.
-    assert "JSON" in prompt or "json" in prompt
+    assert "<tools>" in prompt
+    assert "get_weather" in prompt
+    assert "<function=" in prompt
+    assert "<parameter=" in prompt
+    assert "finish" in prompt
+
+
+def test_prompt_react_mode_does_not_mention_json():
+    """In ReAct mode, the prompt must NOT reference JSON — the word 'JSON'
+    in ReAct's auto-generated instructions is what caused Qwen to emit JSON
+    instead of our expected XML."""
+    prompt = build_system_prompt(
+        "Answer the question.",
+        [_weather_tool()],
+        react_fields=True,
+    )
+    assert "JSON" not in prompt and "json" not in prompt
 
 
 def test_prompt_react_mode_exemplar_is_thought_then_function():

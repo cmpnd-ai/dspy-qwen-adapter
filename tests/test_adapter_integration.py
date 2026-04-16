@@ -157,9 +157,10 @@ def test_parse_non_react_populates_last_output_field():
     assert out["reasoning"] == ""
 
 
-def test_format_react_signature_includes_react_field_mapping():
-    """Qwen35Adapter.format() must emit react-mode guidance when the signature
-    has ReAct's three output fields."""
+def test_format_react_signature_emits_xml_protocol_and_drops_json_directive():
+    """In ReAct mode, format() must (a) emit Qwen XML guidance and (b) NOT
+    leak ReAct's auto-generated 'next_tool_args must be in JSON format' line
+    from signature.instructions — that line is what causes Qwen to emit JSON."""
     a = Qwen35Adapter()
     sig = _sample_signature_with_tools()
 
@@ -177,7 +178,7 @@ def test_format_react_signature_includes_react_field_mapping():
         },
     )
     system = next(m for m in messages if m["role"] == "system")["content"]
-    # React field names must appear in the prompt with the XML mapping
-    assert "next_thought" in system
-    assert "next_tool_name" in system
     assert "<function=" in system
+    assert "<parameter=" in system
+    # The JSON directive from signature.instructions must NOT leak through.
+    assert "JSON" not in system and "json" not in system
