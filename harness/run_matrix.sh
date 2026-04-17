@@ -14,6 +14,7 @@ set -euo pipefail
 
 RUNS=20
 CAPTURE="--capture-traces"
+USE_JUDGE=""
 API_BASE="${LMSTUDIO_BASE:-http://127.0.0.1:1234/v1}"
 ADAPTERS_ARG="chat,json,qwen35"
 SCENARIOS_ARG="s1,s3,s10,s_sql,s_code,s_echo,s_deep,s_i18n"
@@ -24,6 +25,7 @@ while [[ $# -gt 0 ]]; do
     --no-capture) CAPTURE=""; shift ;;
     --adapters) ADAPTERS_ARG="$2"; shift 2 ;;
     --scenarios) SCENARIOS_ARG="$2"; shift 2 ;;
+    --use-judge) USE_JUDGE="--use-judge"; shift ;;
     -h|--help)
       sed -n '2,11p' "$0" | sed 's/^# \?//'
       exit 0 ;;
@@ -60,7 +62,8 @@ for ADAPTER in "${ADAPTERS[@]}"; do
       --adapter "${ADAPTER}" \
       --scenario "${SCENARIO}" \
       --runs "${RUNS}" \
-      ${CAPTURE}
+      ${CAPTURE} \
+      ${USE_JUDGE}
   done
 done
 

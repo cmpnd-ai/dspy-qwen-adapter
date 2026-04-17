@@ -7,8 +7,12 @@ class Scenario:
     name: str
     question: str
     tools: list[Callable]
-    golden_answer_substring: str  # loose string match for success
+    golden_answer_substring: str  # cheap fallback heuristic (substring match)
     expected_min_tool_calls: int
+    # Plain-English rubric the judge LM uses to score pred.answer. Should
+    # describe what a correct answer MUST convey, not necessarily the exact
+    # text. Keep to 1-3 sentences.
+    judge_criterion: str = ""
 
 # --- Tools ---
 
@@ -66,6 +70,10 @@ S1 = Scenario(
     tools=[get_weather],
     golden_answer_substring="sunny",
     expected_min_tool_calls=1,
+    judge_criterion=(
+        "The answer states that the weather in Tokyo is sunny (and/or 72F). "
+        "Must convey the tool's reported weather, not a refusal or a hedge."
+    ),
 )
 
 S3 = Scenario(
@@ -74,6 +82,11 @@ S3 = Scenario(
     tools=[search, calculator, word_count],
     golden_answer_substring="2001",
     expected_min_tool_calls=2,
+    judge_criterion=(
+        "The answer states that 1991 + 10 = 2001 (Python was created by "
+        "Guido van Rossum in 1991, plus 10 is 2001). The number 2001 must "
+        "appear as the result."
+    ),
 )
 
 S10 = Scenario(
@@ -88,6 +101,11 @@ S10 = Scenario(
     ],
     golden_answer_substring="CLOUDY",
     expected_min_tool_calls=3,
+    judge_criterion=(
+        "The answer contains the uppercased weather string for Paris. "
+        "Paris weather is 'cloudy, 60F', uppercased is 'CLOUDY, 60F'. "
+        "The answer must include that uppercased form (or a close variant)."
+    ),
 )
 
 # --- Stress-test tools ---
@@ -170,6 +188,12 @@ S_SQL = Scenario(
     tools=[execute_sql],
     golden_answer_substring="O'Brien",
     expected_min_tool_calls=1,
+    judge_criterion=(
+        "The answer lists at least one user name containing an apostrophe "
+        "from the fake users table (O'Brien and/or d'Angelo). A summary "
+        "like 'found 2 users with apostrophes' without naming them does "
+        "NOT pass — the task specifically asked for the names."
+    ),
 )
 
 S_CODE = Scenario(
@@ -181,6 +205,12 @@ S_CODE = Scenario(
     tools=[write_python, run_python],
     golden_answer_substring="Hello, it's me",
     expected_min_tool_calls=1,
+    judge_criterion=(
+        "The answer reports the function's return value — a dict whose "
+        "'greeting' key maps to the string \"Hello, it's me\". The exact "
+        "string \"Hello, it's me\" (with its apostrophe) must appear in "
+        "the answer."
+    ),
 )
 
 S_ECHO = Scenario(
@@ -193,6 +223,10 @@ S_ECHO = Scenario(
     tools=[format_template, inspect_text],
     golden_answer_substring="28",
     expected_min_tool_calls=2,
+    judge_criterion=(
+        "The answer reports the length as 28 (the length of the formatted "
+        "string '[[ ## answer ## ]] greetings'). The number 28 must appear."
+    ),
 )
 
 S_DEEP = Scenario(
@@ -208,6 +242,12 @@ S_DEEP = Scenario(
     ],
     golden_answer_substring="2",
     expected_min_tool_calls=5,
+    judge_criterion=(
+        "The answer reports a word count of 2. Chain: capital_of(France) "
+        "= Paris, weather(Paris) = 'cloudy, 60F', uppercase = 'CLOUDY, 60F', "
+        "reverse = 'F06 ,YDUOLC', word_count = 2. The number 2 must appear "
+        "as the final reported value."
+    ),
 )
 
 S_I18N = Scenario(
@@ -220,6 +260,14 @@ S_I18N = Scenario(
     tools=[translate],
     golden_answer_substring="SPANISH",
     expected_min_tool_calls=1,
+    judge_criterion=(
+        "The answer acknowledges that the translate tool was invoked for a "
+        "Spanish translation. It should either (a) report the tool's "
+        "output text (which the mock prefixes with '[translated to SPANISH]'), "
+        "or (b) note that the tool did not actually translate into Spanish. "
+        "An answer that just repeats the English text with no mention of "
+        "Spanish or the tool's behavior does NOT pass."
+    ),
 )
 
 

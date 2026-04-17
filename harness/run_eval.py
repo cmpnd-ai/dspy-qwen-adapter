@@ -24,6 +24,7 @@ from dspy.utils.callback import BaseCallback
 
 from dspy_qwen35_adapter import Qwen35Adapter
 from harness.scenarios import ALL_SCENARIOS, Scenario
+from harness.judge import judge_answer
 
 
 RESULTS_DIR = Path(__file__).parent / "results"
@@ -37,7 +38,9 @@ CSV_FIELDS = [
     "max_iters_hit",
     "parse_failures",
     "tool_exec_failures",
-    "task_succeeded",
+    "task_succeeded",  # cheap substring match
+    "judge_pass",      # LLM-judge verdict (empty string when --use-judge is off)
+    "judge_reason",    # one-sentence rationale from the judge
     "error",
 ]
 
@@ -167,8 +170,14 @@ def run_once(
     run_idx: int,
     max_iters: int,
     capture_traces: bool,
+    judge_lm: dspy.LM | None = None,
 ) -> dict[str, Any]:
-    """Execute one ReAct run and return a metrics dict."""
+    """Execute one ReAct run and return a metrics dict.
+
+    When `judge_lm` is provided, score the final answer with an LLM judge
+    against the scenario's `judge_criterion` and record `judge_pass` +
+    `judge_reason`. Otherwise those columns are left blank.
+    """
     counter = ParseFailureCounter()
     callbacks: list[BaseCallback] = [counter]
     if capture_traces:
@@ -193,9 +202,12 @@ def run_once(
         "parse_failures": 0,
         "tool_exec_failures": 0,
         "task_succeeded": False,
+        "judge_pass": "",
+        "judge_reason": "",
         "error": "",
     }
 
+    answer: Any = None
     try:
         with dspy.context(adapter=adapter, callbacks=callbacks):
             signature = _build_signature()
@@ -209,8 +221,9 @@ def run_once(
         last_tool = trajectory.get(f"tool_name_{max_iters - 1}")
         row["max_iters_hit"] = turns >= max_iters and last_tool != "finish"
         row["tool_exec_failures"] = _count_tool_exec_failures(trajectory)
+        answer = getattr(pred, "answer", None)
         row["task_succeeded"] = _check_success(
-            getattr(pred, "answer", None), scenario.golden_answer_substring
+            answer, scenario.golden_answer_substring
         )
     except Exception as e:  # pragma: no cover - only fires on real LM failures
         row["error"] = type(e).__name__
@@ -219,6 +232,23 @@ def run_once(
 
     # parse_failures is accumulated via callback regardless of success/error.
     row["parse_failures"] = counter.parse_failures
+
+    # LLM-judge scoring. Runs only when explicitly configured; a failure
+    # here must not take down the benchmark run (we fall back to empty
+    # judge columns so the row still lands in the CSV).
+    if judge_lm is not None and scenario.judge_criterion:
+        try:
+            verdict, reason = judge_answer(
+                question=scenario.question,
+                criterion=scenario.judge_criterion,
+                answer=answer if answer is not None else "",
+                judge_lm=judge_lm,
+            )
+            row["judge_pass"] = bool(verdict)
+            row["judge_reason"] = reason
+        except Exception as e:
+            row["judge_reason"] = f"[judge error: {type(e).__name__}: {e}]"[:300]
+
     return row
 
 
@@ -284,6 +314,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Override the CSV output path.",
     )
+    p.add_argument(
+        "--use-judge",
+        action="store_true",
+        help=(
+            "Score each run's final answer with an LLM judge against the "
+            "scenario's judge_criterion, adding judge_pass + judge_reason "
+            "columns to the CSV."
+        ),
+    )
+    p.add_argument(
+        "--judge-model",
+        default=os.environ.get("JUDGE_MODEL"),
+        help=(
+            "Model id for the LLM judge (default: $JUDGE_MODEL, else --model). "
+            "Using the same model to judge itself is weaker than a "
+            "stronger/independent judge; flag the finding accordingly."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -302,6 +350,22 @@ def main(argv: list[str] | None = None) -> int:
         cache=False,  # each run must hit the model fresh.
     )
     dspy.configure(lm=lm)
+
+    judge_lm: dspy.LM | None = None
+    if args.use_judge:
+        judge_model = args.judge_model or args.model
+        # Judge at temperature=0 for stable verdicts across runs. Budget is
+        # generous because thinking-mode models burn tokens on reasoning
+        # before emitting the boolean verdict and one-line reason.
+        judge_lm = dspy.LM(
+            model=judge_model,
+            api_base=args.api_base,
+            api_key="lm-studio",
+            temperature=0.0,
+            max_tokens=4096,
+            cache=False,
+        )
+        print(f"[harness] judge enabled: model={judge_model}")
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     csv_path = (
@@ -329,14 +393,18 @@ def main(argv: list[str] | None = None) -> int:
                 run_idx=i,
                 max_iters=args.max_iters,
                 capture_traces=args.capture_traces,
+                judge_lm=judge_lm,
             )
             writer.writerow(row)
             f.flush()
+            judge_bit = (
+                f" judge={row['judge_pass']}" if row.get("judge_pass") != "" else ""
+            )
             print(
                 f"run {i}: turns={row['turns_completed']} "
                 f"parse_fail={row['parse_failures']} "
                 f"tool_fail={row['tool_exec_failures']} "
-                f"ok={row['task_succeeded']}"
+                f"ok={row['task_succeeded']}{judge_bit}"
                 + (f" err={row['error']}" if row["error"] else "")
             )
 
