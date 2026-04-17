@@ -240,3 +240,65 @@ def test_format_trajectory_renders_qwen_native_transcript():
         question: str = dspy.InputField()
         answer: str = dspy.OutputField()
     assert a.format_user_message_content(Plain, {"question": "hi"}) == "question: hi"
+
+
+def test_postprocess_promotes_reasoning_content_when_text_empty():
+    """When LM Studio's reasoning parser routes everything into
+    reasoning_content and leaves text empty, we must fall back to using
+    reasoning_content so parse() runs instead of returning all-None."""
+    a = Qwen35Adapter()
+
+    class Sig(dspy.Signature):
+        """Answer."""
+        question: str = dspy.InputField()
+        reasoning: str = dspy.OutputField()
+        answer: str = dspy.OutputField()
+
+    outputs = [{
+        "text": "",
+        "reasoning_content": (
+            "The user asked about Tokyo weather. I should say it's sunny.\n"
+            "Final answer: Tokyo is sunny."
+        ),
+    }]
+    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
+    assert len(values) == 1
+    # The answer is routed to the LAST output field (Task-10 fallback contract).
+    assert values[0]["answer"], "answer should be populated from reasoning_content"
+    assert "Tokyo is sunny" in values[0]["answer"]
+
+
+def test_postprocess_passthrough_when_text_present():
+    """When text is non-empty, reasoning_content must be ignored — the
+    server has already split reasoning into a side channel and the visible
+    text is what the parser should consume."""
+    a = Qwen35Adapter()
+
+    class Sig(dspy.Signature):
+        """Answer."""
+        question: str = dspy.InputField()
+        reasoning: str = dspy.OutputField()
+        answer: str = dspy.OutputField()
+
+    outputs = [{
+        "text": "Visible answer text.",
+        "reasoning_content": "Hidden thinking that must NOT leak into the answer.",
+    }]
+    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
+    assert values[0]["answer"] == "Visible answer text."
+    assert "Hidden thinking" not in values[0]["answer"]
+
+
+def test_postprocess_noop_when_both_empty():
+    """If text is empty AND reasoning_content is empty/missing, fall through
+    to the base class (which assigns None to every output field)."""
+    a = Qwen35Adapter()
+
+    class Sig(dspy.Signature):
+        """Answer."""
+        question: str = dspy.InputField()
+        answer: str = dspy.OutputField()
+
+    outputs = [{"text": ""}]
+    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
+    assert values[0]["answer"] is None

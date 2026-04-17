@@ -156,6 +156,45 @@ class Qwen35Adapter(Adapter):
         result[output_keys[-1]] = cleaned
         return result
 
+    def _call_postprocess(
+        self,
+        processed_signature,
+        original_signature,
+        outputs,
+        lm,
+        lm_kwargs,
+    ):
+        """Rescue turns where LM Studio / vLLM reasoning-parsers routed
+        everything into `reasoning_content` and left `text` empty.
+
+        Qwen 3 and 3.5 models in "thinking mode" may emit so much <think>
+        content that the server's reasoning parser consumes the entire
+        completion — leaving `text=""`. DSPy's base _call_postprocess then
+        skips `parse()` entirely (base.py:136) and returns all output fields
+        as None, which kills the ReAct / extract turn.
+
+        We merge reasoning_content into text as a fallback so our parser
+        still has something to work with — often the runaway reasoning
+        contains a usable tool-call or final answer at the end.
+        """
+        normalized = []
+        for output in outputs:
+            if (
+                isinstance(output, dict)
+                and not output.get("text")
+                and output.get("reasoning_content")
+            ):
+                output = {**output, "text": output["reasoning_content"]}
+                logger.debug(
+                    "Qwen35Adapter: text was empty; promoted reasoning_content "
+                    "(%d chars) into text for parsing.",
+                    len(output["text"]),
+                )
+            normalized.append(output)
+        return super()._call_postprocess(
+            processed_signature, original_signature, normalized, lm, lm_kwargs
+        )
+
     def format_field_description(self, signature: type[Signature]) -> str:
         return signature.instructions or ""
 
