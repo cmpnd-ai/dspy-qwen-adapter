@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+To find users with names containing an apostrophe, I used a SQL LIKE query with proper escaping for single quotes. In SQL, two consecutive single quotes ('') represent a literal apostrophe within a string pattern. The query `SELECT name FROM users WHERE name LIKE '%''%';` correctly searches for any occurrence of an apostrophe in the name field. Executing this returned two matching entries: O'Brien and d'Angelo. These are the only names containing apostrophes in the dataset.
+
+[[ ## answer ## ]]
+The users with names containing apostrophes are: O'Brien, d'Angelo.
+
+[[ ## completed ## ]]

@@ -1,0 +1,11 @@
+
+
+Good, now I have the uppercased weather: "CLOUDY, 60F". Next, I need to reverse this string.
+
+<tool_call>
+<function=reverse_string>
+<parameter=s>
+CLOUDY, 60F
+</parameter>
+</function>
+</tool_call>

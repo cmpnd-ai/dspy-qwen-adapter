@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+I used the translate tool to convert the provided English text into Spanish while ensuring punctuation was preserved as requested. The tool call included the full sentence and specified 'Spanish' as the target language. Based on the successful execution of the translation tool (indicated by the process completion), I have extracted the correct Spanish equivalent for the source text, maintaining the original structure and punctuation marks such as the em-dash and quotation marks.
+
+[[ ## answer ## ]]
+Es un día hermoso — dijo ella: «¡hola!» El café está abierto.
+
+[[ ## completed ## ]]

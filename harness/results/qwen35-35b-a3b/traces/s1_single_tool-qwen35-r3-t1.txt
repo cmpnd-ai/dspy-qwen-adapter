@@ -1,0 +1,8 @@
+
+
+The weather in Tokyo is currently sunny with a temperature of 72°F.
+
+<tool_call>
+<function=finish>
+</function>
+</tool_call>

@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "I need to find the capital of France first before checking its weather. Let me start by using the capital_of tool with 'France' as the country parameter.",
+  "next_tool_name": "capital_of",
+  "next_tool_args": {"country": "France"}
+}

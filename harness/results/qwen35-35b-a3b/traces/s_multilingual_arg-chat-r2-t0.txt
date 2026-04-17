@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I need to use the translate tool to convert the given English text into Spanish. The text contains punctuation that should be preserved, including em-dashes and quotation marks. I'll call the translate function with the full text and specify Spanish as the target language.
+
+[[ ## next_tool_name ## ]]
+translate
+
+[[ ## next_tool_args ## ]]
+{"text": "It's a beautiful day — she said, \"hello!\" The café is open.", "to": "Spanish"}
+
+[[ ## completed ## ]]

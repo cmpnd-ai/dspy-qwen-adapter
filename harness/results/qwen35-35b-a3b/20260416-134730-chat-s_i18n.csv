@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,error
+s_multilingual_arg,chat,0,2,False,0,0,False,
+s_multilingual_arg,chat,1,2,False,0,0,False,
+s_multilingual_arg,chat,2,2,False,0,0,True,
+s_multilingual_arg,chat,3,2,False,0,0,False,
+s_multilingual_arg,chat,4,2,False,0,0,False,

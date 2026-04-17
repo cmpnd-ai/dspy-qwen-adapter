@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I've found that Paris is the capital of France. Now I need to check the weather in Paris using the get_weather tool, then convert the result to uppercase.
+
+[[ ## next_tool_name ## ]]
+get_weather
+
+[[ ## next_tool_args ## ]]
+{"city": "Paris"}
+
+[[ ## completed ## ]]

@@ -1,0 +1,10 @@
+
+
+I found two users whose names contain an apostrophe:
+
+1. **O'Brien**
+2. **d'Angelo**
+
+<tool_call><function=finish>
+</function>
+</tool_call>

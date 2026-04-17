@@ -1,0 +1,14 @@
+
+
+I need to translate the given English text into Spanish while preserving all punctuation marks. Let me use the translate tool for this task.
+
+<tool_call>
+<function=translate>
+<parameter=text>
+It's a beautiful day — she said, "hello!" The café is open.
+</parameter>
+<parameter=to>
+Spanish
+</parameter>
+</function>
+</tool_call>

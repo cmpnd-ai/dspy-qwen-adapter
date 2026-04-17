@@ -1,0 +1,8 @@
+
+
+I have received the translation result from the tool. Now I will report the translated text verbatim as requested by the user.
+
+<tool_call>
+<function=finish>
+</function>
+</tool_call>

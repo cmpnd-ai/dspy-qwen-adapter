@@ -1,0 +1,9 @@
+
+
+{
+  "next_thought": "I need to find out who created Python and the year it was created. I'll start by searching for this information.",
+  "next_tool_name": "search",
+  "next_tool_args": {
+    "query": "who created Python programming language"
+  }
+}

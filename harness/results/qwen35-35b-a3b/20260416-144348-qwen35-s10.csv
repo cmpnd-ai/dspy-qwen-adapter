@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,error
+s10_ten_tools,qwen35,0,4,False,0,0,True,
+s10_ten_tools,qwen35,1,4,False,0,0,True,
+s10_ten_tools,qwen35,2,4,False,0,0,True,
+s10_ten_tools,qwen35,3,4,False,0,0,True,
+s10_ten_tools,qwen35,4,4,False,0,0,True,

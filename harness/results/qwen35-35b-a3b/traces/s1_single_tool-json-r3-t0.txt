@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "The question asks about weather in Tokyo. I have access to a get_weather tool that can retrieve weather information for a specific city. Since no previous observations exist, I should call get_weather with Tokyo as the city parameter.",
+  "next_tool_name": "get_weather",
+  "next_tool_args": {"city": "Tokyo"}
+}

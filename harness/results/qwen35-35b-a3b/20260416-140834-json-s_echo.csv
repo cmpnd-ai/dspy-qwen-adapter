@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,error
+s_adversarial_echo,json,0,3,False,0,0,True,
+s_adversarial_echo,json,1,3,False,0,0,True,
+s_adversarial_echo,json,2,3,False,0,0,True,
+s_adversarial_echo,json,3,3,False,0,0,True,
+s_adversarial_echo,json,4,3,False,0,0,True,

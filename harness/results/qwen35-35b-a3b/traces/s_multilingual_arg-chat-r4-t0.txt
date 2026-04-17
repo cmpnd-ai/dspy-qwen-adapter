@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I need to translate the given English text into Spanish using the translate tool while preserving all punctuation marks. The text contains various punctuation including em-dash, quotation marks, and exclamation mark that should be kept intact in the translation.
+
+[[ ## next_tool_name ## ]]
+translate
+
+[[ ## next_tool_args ## ]]
+{"text": "It's a beautiful day — she said, \"hello!\" The café is open.", "to": "Spanish"}
+
+[[ ## completed ## ]]
