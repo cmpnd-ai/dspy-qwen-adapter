@@ -140,24 +140,46 @@ This manifested in the 4B run as:
 before parsing. Our existing `strip_think` + `split_thought_and_call`
 pipeline then runs on it and recovers any trailing tool call or answer.
 
-### 5. The `s_i18n` flip between models is a benchmark-metric artifact
+### 5. The `s_i18n` flip between models is a model-capability regression, not a metric artifact
 
 On 35B, qwen35 wins `s_i18n` 100-20-0. On 4B, chat wins 100-0-0 with qwen35
-at 0%. Investigating the traces:
+at 0%. An earlier version of this doc attributed the flip to the
+loose substring metric; a follow-up run with the LLM-judge metric (see
+§6) confirmed the judge **agrees with substring on 4B**: the qwen35 4B
+answer genuinely is weaker than the chat 4B answer, not just paraphrased.
 
-- 35B chat tends to strip the mock `[translated to SPANISH]` prefix when
-  reporting; our adapter's cleaner trajectory kept the prefix visible.
-- 4B chat literally echoes the whole tool output (including the prefix) on
-  the extract turn — a simpler-model behavior that accidentally matches
-  the golden substring.
-- 4B qwen35 cleans up the mock prefix the model perceives as noise, and
-  the substring match fails.
+What's actually happening:
 
-This is a **benchmark-metric weakness**, not an adapter issue. The golden
-substring `"SPANISH"` is a proxy for "the model acknowledged what the
-tool returned," and whether the model verbatim-echoes or paraphrases depends
-on capability × prompt style. A better metric would be an LLM-judge scoring
-against the full expected answer shape.
+- **35B chat** sometimes strips the mock `[translated to SPANISH]` prefix
+  when reporting (20% pass); qwen35's trajectory keeps it visible (100%).
+- **4B chat** literally echoes the tool's observation including the
+  prefix — a simpler-model "just copy the trajectory" behavior that
+  happens to mention "Spanish."
+- **4B qwen35** paraphrases the observation away, claims the tool's
+  English output IS the Spanish translation, and loses the context that
+  a translation was attempted.
+
+The takeaway: the adapter's cleaner trajectory rendering is a win on the
+35B model (keeps important context salient) and a loss on the 4B model
+(the paraphrase is too aggressive for a weak model to reconstruct the
+right answer). Adapter benefits are capability-dependent.
+
+### 6. LLM-judge validation confirms the substring metric is directionally correct
+
+We re-ran a narrow slice (4B, `s_i18n`, 3 runs per adapter) with an
+LLM-judge metric against per-scenario rubrics (`Scenario.judge_criterion`).
+Results aligned perfectly with the substring match — chat 100/100, json
+0/0, qwen35 0/0 — but the judge's one-sentence reasons are more
+informative:
+
+- json's "answer is empty" reason pinpoints the thinking-mode empty-text
+  failure mode (finding #4).
+- qwen35's "repeats the original English text instead of reporting a
+  Spanish translation" reason pinpoints the paraphrasing regression
+  described above.
+
+Full cross-model rerun with the judge is future work; see `--use-judge`
+in the harness docs.
 
 ## Limitations and threats to validity
 
