@@ -1,0 +1,10 @@
+
+
+{
+  "next_thought": "The question asks me to translate a specific English text into Spanish using the translate tool. I need to call the translate tool with the exact text provided and specify 'Spanish' as the target language.",
+  "next_tool_name": "translate",
+  "next_tool_args": {
+    "text": "It's a beautiful day — she said, \"hello!\" The café is open.",
+    "to": "Spanish"
+  }
+}

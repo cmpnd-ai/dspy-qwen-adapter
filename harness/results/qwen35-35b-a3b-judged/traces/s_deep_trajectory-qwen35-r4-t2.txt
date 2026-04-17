@@ -1,0 +1,11 @@
+
+
+Good, now I have the weather for Paris: "cloudy, 60F". Next, I need to uppercase this string.
+
+<tool_call>
+<function=uppercase>
+<parameter=s>
+cloudy, 60F
+</parameter>
+</function>
+</tool_call>

@@ -1,0 +1,8 @@
+
+
+The length reported by inspect_text is 28.
+
+<tool_call>
+<function=finish>
+</function>
+</tool_call>

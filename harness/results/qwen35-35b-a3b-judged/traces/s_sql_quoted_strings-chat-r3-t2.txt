@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]  
+The SQL query `SELECT name FROM users WHERE name LIKE '%''%';` correctly searches for apostrophes by escaping them with two single quotes (`''`). The execution returned two matching entries: O'Brien and d'Angelo, confirming these are the only users with apostrophes in their names.
+
+[[ ## answer ## ]]  
+The users whose names contain an apostrophe are: O'Brien and d'Angelo.
+
+[[ ## completed ## ]]

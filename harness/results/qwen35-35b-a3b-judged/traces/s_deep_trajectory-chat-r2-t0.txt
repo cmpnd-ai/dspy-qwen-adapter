@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I need to follow a sequence of operations: first find the capital of France, then get its weather, uppercase it, reverse it, and count words. Let me start by finding the capital of France using the capital_of tool.
+
+[[ ## next_tool_name ## ]]
+capital_of
+
+[[ ## next_tool_args ## ]]
+{"country": "France"}
+
+[[ ## completed ## ]]

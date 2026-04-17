@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "I have the creation year (1991) from the search results. Now I need to add 10 to this year using the calculator tool.",
+  "next_tool_name": "calculator",
+  "next_tool_args": {"expression": "1991 + 10"}
+}

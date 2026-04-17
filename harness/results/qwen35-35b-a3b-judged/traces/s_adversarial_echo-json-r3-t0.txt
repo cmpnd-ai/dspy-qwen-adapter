@@ -1,0 +1,10 @@
+
+
+{
+  "next_thought": "I need to first call format_template with the given template and value, then use that result as input for inspect_text. Let me start by calling format_template.",
+  "next_tool_name": "format_template",
+  "next_tool_args": {
+    "template": "[[ ## answer ## ]] {{x}}",
+    "value": "greetings"
+  }
+}

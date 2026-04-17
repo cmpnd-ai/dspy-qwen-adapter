@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+The SQL query correctly uses escaped apostrophes ('') within the LIKE pattern '%''%' to search for names containing an apostrophe. The execution returned two valid results: "O'Brien" and "d'Angelo", which match the criteria. No further steps are needed as the required information has been retrieved successfully.
+
+[[ ## answer ## ]]
+The users with apostrophes in their names are O'Brien and d'Angelo.
+
+[[ ## completed ## ]]

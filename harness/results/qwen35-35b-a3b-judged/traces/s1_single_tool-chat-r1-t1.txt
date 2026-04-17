@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I now have the weather information for Tokyo from the tool observation: sunny with 72F temperature. This is sufficient to answer the user's question about the weather in Tokyo. I can now mark the task as complete using the finish tool.
+
+[[ ## next_tool_name ## ]]
+finish
+
+[[ ## next_tool_args ## ]]
+{}
+
+[[ ## completed ## ]]

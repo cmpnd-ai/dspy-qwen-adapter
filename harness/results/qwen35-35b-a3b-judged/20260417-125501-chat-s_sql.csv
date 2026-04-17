@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_sql_quoted_strings,chat,0,2,False,0,0,True,True,"The answer explicitly lists the required usernames O'Brien and d'Angelo, satisfying the requirement to report the specific names rather than just a summary count.",
+s_sql_quoted_strings,chat,1,2,False,0,0,True,True,"The answer explicitly lists both expected user names (O'Brien and d'Angelo) containing apostrophes, satisfying the requirement to report the specific names found.",
+s_sql_quoted_strings,chat,2,2,False,0,0,True,True,The answer correctly identifies and lists both user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,
+s_sql_quoted_strings,chat,3,2,False,0,0,True,True,The answer satisfies the criterion by explicitly listing the user names O'Brien and d'Angelo that contain apostrophes.,
+s_sql_quoted_strings,chat,4,2,False,0,0,True,True,The answer correctly identifies and lists both user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,

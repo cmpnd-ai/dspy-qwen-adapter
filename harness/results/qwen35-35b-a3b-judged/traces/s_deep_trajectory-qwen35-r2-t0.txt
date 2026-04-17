@@ -1,0 +1,11 @@
+
+
+I need to follow a sequence of steps to answer this question. Let me start by finding the capital of France.
+
+<tool_call>
+<function=capital_of>
+<parameter=country>
+France
+</parameter>
+</function>
+</tool_call>

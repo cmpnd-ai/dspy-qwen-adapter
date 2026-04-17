@@ -1,0 +1,9 @@
+
+
+Based on my research:
+
+1. **Capital of France**: Paris
+2. **Weather in Paris**: cloudy, 60F
+3. **Uppercase Weather Description**: CLOUDY, 60F
+
+The capital of France is Paris, and the current weather there is "CLOUDY, 60F" when converted to uppercase.

@@ -1,0 +1,11 @@
+
+
+I found that the capital of France is Paris and the weather there is "cloudy, 60F". Now I need to convert this weather description to uppercase.
+
+<tool_call>
+<function=uppercase>
+<parameter=s>
+cloudy, 60F
+</parameter>
+</function>
+</tool_call>

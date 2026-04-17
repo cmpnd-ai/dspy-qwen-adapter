@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "All required information has been collected: capital of France is Paris, its weather is cloudy, 60F, and the uppercase version is CLOUDY, 60F. The task is complete.",
+  "next_tool_name": "finish",
+  "next_tool_args": {}
+}

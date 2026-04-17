@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_multilingual_arg,qwen35,0,2,False,0,0,True,True,"The answer passes because it explicitly notes that the tool did not actually translate into Spanish in this mock environment, satisfying criterion requirement (b).",
+s_multilingual_arg,qwen35,1,2,False,0,0,True,True,"The answer satisfies the criterion by acknowledging the tool invocation, reporting the text with the required prefix, and noting that the translation did not actually occur into Spanish.",
+s_multilingual_arg,qwen35,2,2,False,0,0,True,True,"The answer meets the criterion by acknowledging the tool was invoked and noting that the simulated environment returned English text instead of performing an actual Spanish translation, satisfying option (b).",
+s_multilingual_arg,qwen35,3,2,False,0,0,True,True,"The answer satisfies the criterion by explicitly acknowledging the tool invocation and noting that it returned English text instead of Spanish, fulfilling condition (b).",
+s_multilingual_arg,qwen35,4,2,False,0,0,True,False,,

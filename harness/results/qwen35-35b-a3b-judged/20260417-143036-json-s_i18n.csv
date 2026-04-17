@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_multilingual_arg,json,0,2,False,0,0,False,False,The answer fails because it simply repeats the original English text without acknowledging the translation tool or providing a Spanish translation as required by the criterion.,
+s_multilingual_arg,json,1,2,False,0,0,True,True,The answer meets the criterion by acknowledging the tool invocation and explicitly noting that the tool failed to produce a Spanish translation as required by option (b).,
+s_multilingual_arg,json,2,2,False,0,0,False,False,The answer fails because it simply repeats the original English text without acknowledging the translation tool or providing a Spanish translation as required by the criterion.,
+s_multilingual_arg,json,3,2,False,0,0,False,False,The answer fails to acknowledge that the translate tool was invoked or report the expected formatted output as required by the criterion.,
+s_multilingual_arg,json,4,2,False,0,0,True,True,"The answer meets the criterion by including the required mock prefix '[translated to SPANISH]', which acknowledges the tool invocation for Spanish translation as specified in option (a).",

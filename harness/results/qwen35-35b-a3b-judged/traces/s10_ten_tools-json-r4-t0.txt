@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "I need to complete a multi-step task: find the capital of France, check its weather, and return the uppercase version of the weather description. Let me start by finding the capital of France using the capital_of tool.",
+  "next_tool_name": "capital_of",
+  "next_tool_args": {"country": "France"}
+}

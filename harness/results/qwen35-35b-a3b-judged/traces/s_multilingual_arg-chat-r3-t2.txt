@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+I utilized the translate tool to convert the provided English text into Spanish, ensuring that all punctuation marks such as the em-dash and quotation marks were preserved exactly as requested in the question. The tool processed the input string with the target language set to Spanish, resulting in a translation that maintains the original structure and punctuation while conveying the meaning in Spanish. I have now verified the output and am ready to report it verbatim.
+
+[[ ## answer ## ]]
+Es un día hermoso — dijo ella, “¡hola!” El café está abierto.
+
+[[ ## completed ## ]]

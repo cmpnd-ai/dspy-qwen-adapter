@@ -1,0 +1,11 @@
+
+
+I found that Python was created by Guido van Rossum in 1991. Now I need to calculate the year plus 10.
+
+<tool_call>
+<function=calculator>
+<parameter=expression>
+1991 + 10
+</parameter>
+</function>
+</tool_call>

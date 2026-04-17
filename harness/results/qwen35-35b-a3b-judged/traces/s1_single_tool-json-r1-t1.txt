@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "I have received the weather information for Tokyo (sunny, 72F). All necessary data has been collected.",
+  "next_tool_name": "finish",
+  "next_tool_args": {}
+}

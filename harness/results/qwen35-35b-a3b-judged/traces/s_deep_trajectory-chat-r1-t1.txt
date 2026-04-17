@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I now know that Paris is the capital of France. The next step is to get the weather information for Paris using the get_weather tool.
+
+[[ ## next_tool_name ## ]]
+get_weather
+
+[[ ## next_tool_args ## ]]
+{"city": "Paris"}
+
+[[ ## completed ## ]]

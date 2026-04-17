@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_sql_quoted_strings,qwen35,0,2,False,0,0,True,True,The answer correctly identifies and lists both O'Brien and d'Angelo as requested by the criterion.,
+s_sql_quoted_strings,qwen35,1,2,False,0,0,True,True,The answer correctly identifies and lists both O'Brien and d'Angelo as requested by the criterion.,
+s_sql_quoted_strings,qwen35,2,2,False,0,0,True,True,The answer correctly identifies and lists both O'Brien and d'Angelo as requested by the criterion.,
+s_sql_quoted_strings,qwen35,3,2,False,0,0,True,True,The answer correctly identifies and lists both O'Brien and d'Angelo as requested by the criterion.,
+s_sql_quoted_strings,qwen35,4,2,False,0,0,True,True,The answer correctly identifies and lists both O'Brien and d'Angelo as requested by the criterion.,

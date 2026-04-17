@@ -1,0 +1,8 @@
+
+
+The translate tool has processed my request. However, looking at the output, it appears the mock translation didn't actually change the text content - it just added a tag prefix indicating Spanish translation. Let me report what was returned verbatim as requested:
+
+<tool_call>
+<function=finish>
+</function>
+</tool_call>

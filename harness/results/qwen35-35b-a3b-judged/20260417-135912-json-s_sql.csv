@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_sql_quoted_strings,json,0,2,False,0,0,True,True,The answer correctly lists both user names containing apostrophes as required by the criterion.,
+s_sql_quoted_strings,json,1,2,False,0,0,True,True,The answer correctly lists both user names containing apostrophes as required by the criterion.,
+s_sql_quoted_strings,json,2,2,False,0,0,True,True,"The answer explicitly lists the user names O'Brien and d'Angelo, satisfying the requirement to report the specific names found rather than just a count.",
+s_sql_quoted_strings,json,3,2,False,0,0,True,True,"The answer explicitly lists the required usernames O'Brien and d'Angelo, satisfying the criterion that specific names must be reported rather than just a summary count.",
+s_sql_quoted_strings,json,4,2,False,0,0,True,True,The answer correctly lists both user names containing apostrophes as required by the criterion.,

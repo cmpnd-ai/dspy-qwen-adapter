@@ -1,0 +1,10 @@
+
+
+I searched for all users whose names contain an apostrophe using SQL's LIKE operator with proper escaping (doubled single quotes). 
+
+**Users found with apostrophes in their names:**
+
+1. **O'Brien** - Found on 2024-03-12
+2. **d'Angelo** - Found on 2024-07-21
+
+These are the only two users in the database whose names contain an apostrophe character.

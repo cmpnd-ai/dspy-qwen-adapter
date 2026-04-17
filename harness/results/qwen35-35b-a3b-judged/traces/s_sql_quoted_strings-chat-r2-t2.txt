@@ -1,0 +1,11 @@
+
+
+[[ ## reasoning ## ]]
+To find users with apostrophes in their names, I used a SQL query with `LIKE '%''%'` where two single quotes (`''`) represent an escaped apostrophe within the pattern. This correctly searches for any name containing `'`. The executed query returned two results: O'Brien and d'Angelo, both of which contain apostrophes. No further filtering or adjustments are needed as the query properly handles special characters in SQL string patterns.
+
+[[ ## answer ## ]]
+The users with names containing an apostrophe are:  
+1. O'Brien  
+2. d'Angelo  
+
+[[ ## completed ## ]]

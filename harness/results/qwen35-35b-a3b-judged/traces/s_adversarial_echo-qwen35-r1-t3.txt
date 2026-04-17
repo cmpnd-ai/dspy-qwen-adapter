@@ -1,0 +1,3 @@
+
+
+The length reported by inspect_text is **28**.
