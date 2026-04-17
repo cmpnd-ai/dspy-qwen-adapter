@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I need to translate the given English text into Spanish using the translate tool. The text contains punctuation that needs to be preserved exactly as requested. I have all the information needed - the source text and target language (Spanish).
+
+[[ ## next_tool_name ## ]]
+translate
+
+[[ ## next_tool_args ## ]]
+{"text": "It's a beautiful day — she said, \"hello!\" The café is open.", "to": "Spanish"}
+
+[[ ## completed ## ]]

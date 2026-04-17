@@ -1,0 +1,11 @@
+
+
+```json
+{
+  "next_thought": "I have found that Paris is the capital of France. Now I need to get the weather for Paris.",
+  "next_tool_name": "get_weather",
+  "next_tool_args": {
+    "city": "Paris"
+  }
+}
+```

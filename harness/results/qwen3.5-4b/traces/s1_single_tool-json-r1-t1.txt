@@ -1,0 +1,9 @@
+
+
+```json
+{
+  "next_thought": "I have received the weather information for Tokyo - it's sunny at 72°F. Now I can provide the complete answer to the user and mark this task as finished.",
+  "next_tool_name": "finish",
+  "next_tool_args": {}
+}
+```

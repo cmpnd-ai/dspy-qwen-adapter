@@ -1,0 +1,11 @@
+
+
+I have the result from format_template: "[[ ## answer ## ]] greetings". Now I'll call inspect_text with this text to get its length.
+
+<tool_call>
+<function=inspect_text>
+<parameter=text>
+[[ ## answer ## ]] greetings
+</parameter>
+</function>
+</tool_call>

@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,error
+s_deep_trajectory,chat,0,7,False,0,1,True,
+s_deep_trajectory,chat,1,7,False,0,1,True,
+s_deep_trajectory,chat,2,7,False,0,1,True,
+s_deep_trajectory,chat,3,7,False,0,1,True,
+s_deep_trajectory,chat,4,7,False,0,1,True,

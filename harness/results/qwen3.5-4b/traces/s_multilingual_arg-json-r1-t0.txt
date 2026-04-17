@@ -1,0 +1,12 @@
+
+
+```json
+{
+  "next_thought": "I need to translate the given English text into Spanish using the translate tool. The text is: 'It's a beautiful day — she said, \"hello!\" The café is open.' I will call the translate tool with this text and target language set to Spanish.",
+  "next_tool_name": "translate",
+  "next_tool_args": {
+    "text": "It's a beautiful day — she said, \"hello!\" The café is open.",
+    "to": "Spanish"
+  }
+}
+```

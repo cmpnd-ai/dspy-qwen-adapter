@@ -1,0 +1,11 @@
+
+
+I need to find all users whose names contain an apostrophe using execute_sql. I'll write a SQL query that searches for names containing the apostrophe character.
+
+<tool_call>
+<function=execute_sql>
+<parameter=query>
+SELECT name FROM users WHERE name LIKE '%\'%'
+</parameter>
+</function>
+</tool_call>

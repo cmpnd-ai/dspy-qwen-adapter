@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,error
+s_multilingual_arg,qwen35,0,2,False,0,0,False,
+s_multilingual_arg,qwen35,1,2,False,0,0,False,
+s_multilingual_arg,qwen35,2,2,False,0,0,False,
+s_multilingual_arg,qwen35,3,2,False,0,0,False,
+s_multilingual_arg,qwen35,4,2,False,0,0,False,

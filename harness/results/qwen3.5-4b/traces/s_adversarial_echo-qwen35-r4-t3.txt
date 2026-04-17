@@ -1,0 +1,3 @@
+
+
+The `inspect_text` function reports a length of **28** characters for the formatted string "[[ ## answer ## ]] greetings".
