@@ -5,7 +5,7 @@
 #   ./harness/run_matrix.sh                                # full: all 3 adapters, 20 runs
 #   ./harness/run_matrix.sh --runs 5                       # smaller sample
 #   ./harness/run_matrix.sh --runs 1 --no-capture          # quickest smoke
-#   ./harness/run_matrix.sh --adapters json,qwen35         # skip chat (already proven)
+#   ./harness/run_matrix.sh --adapters json,qwen         # skip chat (already proven)
 #   ./harness/run_matrix.sh --scenarios s3,s10             # skip s1
 #
 # Must be run from the repo root with .venv activated or discoverable.
@@ -16,7 +16,7 @@ RUNS=20
 CAPTURE="--capture-traces"
 USE_JUDGE=""
 API_BASE="${LMSTUDIO_BASE:-http://127.0.0.1:1234/v1}"
-ADAPTERS_ARG="chat,json,xml,qwen35"
+ADAPTERS_ARG="chat,json,xml,qwen"
 SCENARIOS_ARG="s1,s3,s10,s_sql,s_code,s_echo,s_deep,s_i18n"
 
 while [[ $# -gt 0 ]]; do

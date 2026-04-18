@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dspy_qwen35_adapter.parsing import (
+from dspy_qwen_adapter.parsing import (
     coerce_args_to_schema,
     extract_tool_call,
     split_thought_and_call,

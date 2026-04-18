@@ -1,7 +1,7 @@
 import dspy
 import pytest
 from dspy.adapters.types.tool import Tool
-from dspy_qwen35_adapter import Qwen35Adapter
+from dspy_qwen_adapter import QwenAdapter
 
 
 def _sample_signature_with_tools():
@@ -17,18 +17,18 @@ def _sample_signature_with_tools():
 
 
 def test_adapter_instantiates():
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     assert a.use_native_function_calling is False
     assert a.strict_parse is False
 
 
 def test_adapter_accepts_strict_parse_flag():
-    a = Qwen35Adapter(strict_parse=True)
+    a = QwenAdapter(strict_parse=True)
     assert a.strict_parse is True
 
 
 def test_parse_happy_path_returns_react_fields():
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
     completion = (
         "I should check.\n"
@@ -41,7 +41,7 @@ def test_parse_happy_path_returns_react_fields():
 
 
 def test_parse_strips_think_before_splitting():
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
     completion = (
         "<think>internal</think>"
@@ -54,7 +54,7 @@ def test_parse_strips_think_before_splitting():
 
 
 def test_format_produces_system_with_tools_block():
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
 
     def get_weather(city: str) -> str:
@@ -76,7 +76,7 @@ def test_format_produces_system_with_tools_block():
 
 
 def test_format_assistant_message_replays_qwen_xml():
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
     content = a.format_assistant_message_content(
         sig,
@@ -96,14 +96,14 @@ def test_format_assistant_message_replays_qwen_xml():
 
 def test_strict_parse_raises_when_no_call():
     from dspy.utils.exceptions import AdapterParseError
-    a = Qwen35Adapter(strict_parse=True)
+    a = QwenAdapter(strict_parse=True)
     sig = _sample_signature_with_tools()
     with pytest.raises(AdapterParseError):
         a.parse(sig, "Just some plain text")
 
 
 def test_non_strict_returns_finish_when_no_call():
-    a = Qwen35Adapter(strict_parse=False)
+    a = QwenAdapter(strict_parse=False)
     sig = _sample_signature_with_tools()
     out = a.parse(sig, "Plain answer")
     assert out["next_tool_name"] == "finish"
@@ -112,7 +112,7 @@ def test_non_strict_returns_finish_when_no_call():
 
 
 def test_react_completes_with_qwen_adapter_and_dummy_lm():
-    """Run a full ReAct loop against DummyLM using Qwen35Adapter.
+    """Run a full ReAct loop against DummyLM using QwenAdapter.
     Verifies format+parse round-trip without any network."""
     from dspy.utils.dummies import DummyLM
 
@@ -137,7 +137,7 @@ def test_react_completes_with_qwen_adapter_and_dummy_lm():
         ]
     )
 
-    with dspy.context(lm=lm, adapter=Qwen35Adapter()):
+    with dspy.context(lm=lm, adapter=QwenAdapter()):
         react = dspy.ReAct("question -> answer", tools=[get_weather])
         pred = react(question="What's the weather in Tokyo?")
 
@@ -157,7 +157,7 @@ def test_parse_non_react_delegates_to_xml_adapter():
         reasoning: str = dspy.OutputField()
         answer: str = dspy.OutputField()
 
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     completion = (
         "<think>let me think</think>\n"
         "<reasoning>\nTokyo has mild spring weather.\n</reasoning>\n"
@@ -172,7 +172,7 @@ def test_format_react_signature_emits_xml_protocol_and_drops_json_directive():
     """In ReAct mode, format() must (a) emit Qwen XML guidance and (b) NOT
     leak ReAct's auto-generated 'next_tool_args must be in JSON format' line
     from signature.instructions — that line is what causes Qwen to emit JSON."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
 
     def get_weather(city: str) -> str:
@@ -199,7 +199,7 @@ def test_format_assistant_tool_call_is_canonical_qwen_35():
     """The replayed assistant turn must match Qwen 3.5's trained chat_template
     format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>...
     </function></tool_call>."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
     sig = _sample_signature_with_tools()
     content = a.format_assistant_message_content(
         sig,
@@ -224,7 +224,7 @@ def test_format_trajectory_renders_qwen_native_transcript():
     input dict (ReAct's replay path), the output must be a Qwen-native
     transcript: reasoning as prose, tool calls in canonical XML, observations
     wrapped in <tool_response>."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
 
     trajectory = {
         "thought_0": "I should check the weather.",
@@ -264,7 +264,7 @@ def test_postprocess_promotes_reasoning_content_when_text_empty():
     Non-ReAct path goes through XMLAdapter.parse which needs field tags;
     the promoted reasoning_content here includes them, simulating a turn
     where the model emitted <answer> inside reasoning mode."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
 
     class Sig(dspy.Signature):
         """Answer."""
@@ -289,7 +289,7 @@ def test_postprocess_passthrough_when_text_present():
     """When text is non-empty, reasoning_content must be ignored — the
     server has already split reasoning into a side channel and the visible
     text is what the parser should consume."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
 
     class Sig(dspy.Signature):
         """Answer."""
@@ -312,7 +312,7 @@ def test_postprocess_passthrough_when_text_present():
 def test_postprocess_noop_when_both_empty():
     """If text is empty AND reasoning_content is empty/missing, fall through
     to the base class (which assigns None to every output field)."""
-    a = Qwen35Adapter()
+    a = QwenAdapter()
 
     class Sig(dspy.Signature):
         """Answer."""

@@ -6,17 +6,17 @@ from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.signatures.signature import Signature
 from dspy.utils.callback import BaseCallback
 
-from dspy_qwen35_adapter.parsing import (
+from dspy_qwen_adapter.parsing import (
     strip_think,
     split_thought_and_call,
 )
-from dspy_qwen35_adapter.prompts import build_system_prompt
+from dspy_qwen_adapter.prompts import build_system_prompt
 
 logger = logging.getLogger(__name__)
 
 # DSPy's `Adapter.__init_subclass__` wraps `format` and `parse` with
 # `with_callbacks` on every subclass. That re-wraps inherited methods: by the
-# time we reach `Qwen35Adapter`, `XMLAdapter.format` is already double-wrapped
+# time we reach `QwenAdapter`, `XMLAdapter.format` is already double-wrapped
 # (once for ChatAdapter + once for XMLAdapter), and a naive `super().format()`
 # call would emit two extra callback spans on top of our own wrapper.
 #
@@ -124,7 +124,7 @@ def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-class Qwen35Adapter(XMLAdapter):
+class QwenAdapter(XMLAdapter):
     """DSPy adapter for Qwen 3.5 that keeps the model in its trained
     distribution across both tool-calling and plain Predict signatures.
 
@@ -264,7 +264,7 @@ class Qwen35Adapter(XMLAdapter):
                 if self.strict_parse:
                     from dspy.utils.exceptions import AdapterParseError
                     raise AdapterParseError(
-                        adapter_name="Qwen35Adapter",
+                        adapter_name="QwenAdapter",
                         signature=signature,
                         lm_response=completion,
                         message="No <function=...> tool call found.",
@@ -316,7 +316,7 @@ class Qwen35Adapter(XMLAdapter):
             ):
                 output = {**output, "text": output["reasoning_content"]}
                 logger.debug(
-                    "Qwen35Adapter: text was empty; promoted reasoning_content "
+                    "QwenAdapter: text was empty; promoted reasoning_content "
                     "(%d chars) into text for parsing.",
                     len(output["text"]),
                 )

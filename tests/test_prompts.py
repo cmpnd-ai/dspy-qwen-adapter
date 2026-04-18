@@ -1,6 +1,6 @@
 import dspy
 from dspy.adapters.types.tool import Tool
-from dspy_qwen35_adapter.prompts import build_system_prompt
+from dspy_qwen_adapter.prompts import build_system_prompt
 
 
 def _weather_tool():
@@ -47,7 +47,7 @@ def test_prompt_empty_tools_omits_tools_block():
 def test_exemplar_round_trips_through_parser():
     """The one-shot exemplar in the system prompt must parse back correctly,
     otherwise Qwen learning from it will produce un-parseable output."""
-    from dspy_qwen35_adapter.parsing import extract_tool_call
+    from dspy_qwen_adapter.parsing import extract_tool_call
     prompt = build_system_prompt("T", [_weather_tool()])
     call = extract_tool_call(prompt)
     assert call == ("example_tool", {"arg1": "value1", "arg2": "value2"})
@@ -104,6 +104,6 @@ def test_prompt_react_mode_exemplar_is_thought_then_function():
     # Must include a concrete example with thought text BEFORE <function=...>
     assert "<function=" in prompt
     # And the exemplar must round-trip through the parser cleanly
-    from dspy_qwen35_adapter.parsing import extract_tool_call
+    from dspy_qwen_adapter.parsing import extract_tool_call
     call = extract_tool_call(prompt)
     assert call is not None  # The exemplar call should be parseable

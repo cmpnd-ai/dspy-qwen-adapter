@@ -5,7 +5,7 @@ metrics, and writes a CSV to harness/results/. Optionally dumps raw LM
 content to harness/traces/ for fixture promotion.
 
 Example:
-    python -m harness.run_eval --adapter qwen35 --scenario s1 --runs 20
+    python -m harness.run_eval --adapter qwen --scenario s1 --runs 20
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 import dspy
 from dspy.utils.callback import BaseCallback
 
-from dspy_qwen35_adapter import Qwen35Adapter
+from dspy_qwen_adapter import QwenAdapter
 from harness.scenarios import ALL_SCENARIOS, Scenario
 from harness.judge import judge_answer
 
@@ -71,8 +71,8 @@ def build_adapter(name: str):
     if name == "xml":
         from dspy.adapters.xml_adapter import XMLAdapter
         return XMLAdapter()
-    if name == "qwen35":
-        return Qwen35Adapter()
+    if name == "qwen":
+        return QwenAdapter()
     raise ValueError(f"unknown adapter: {name}")
 
 
@@ -269,7 +269,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--adapter",
         required=True,
-        choices=["chat", "json", "xml", "qwen35"],
+        choices=["chat", "json", "xml", "qwen"],
         help="Which adapter to evaluate.",
     )
     p.add_argument(

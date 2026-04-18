@@ -55,7 +55,7 @@ reasoning, and limitations.
 
 ### qwen3.5-35b-a3b
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s1, s_sql, s_code | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | **s3 (three tools)** | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
@@ -66,7 +66,7 @@ reasoning, and limitations.
 
 ### qwen3.5-4b
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s3, s10, s_sql | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s1 (single tool) | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
@@ -81,7 +81,7 @@ Qwen 3 was trained on Hermes-style tool calls, not the XML format this
 adapter prompts for. The benchmark tests whether in-context compliance
 is strong enough to bridge the distribution gap.
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s1, s10, s_deep | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s3 (three tools) | 100 / 100 / 0.00 | 100 / 100 / **2.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
@@ -96,18 +96,18 @@ prefixes regardless of adapter. See [docs/benchmarks.md](docs/benchmarks.md).)*
 
 ### Headline findings
 
-- **0 parse failures across all 600 qwen35-adapter runs on all three models.**
+- **0 parse failures across all 600 qwen-adapter runs on all three models.**
   XMLAdapter by comparison failed every `s3` run on 35B and every `s_code`
   run on 4B (parse_fail 1.00 per run).
 - **0.00 tool_fail per run on every scenario on every model.** The closest
   alternatives spike to 0.20 – 2.20 on multi-step and structured-arg
   scenarios. Same or better task success, fewer wasted turns.
 - **Only adapter that reliably handles multilingual / delimiter-leaking
-  tool output on 35B.** `s_i18n`: `qwen35` 100/80 vs chat 0/0, json 40/40,
+  tool output on 35B.** `s_i18n`: `qwen` 100/80 vs chat 0/0, json 40/40,
   xml 0/0.
 - **Rescues `reasoning_content` turns** that silently break stock adapters
   on thinking-mode models. `json` lost a run on `s_echo` 4B this way;
-  `qwen35` caught it via the fallback.
+  `qwen` caught it via the fallback.
 - **Works on Qwen 3 despite the training-distribution mismatch.** The XML
   exemplar in our prompt is strong enough that Qwen 3 (trained on
   Hermes) follows it anyway, and our adapter still posts the best
@@ -133,7 +133,7 @@ pip install -e .
 
 ```python
 import dspy
-from dspy_qwen35_adapter import Qwen35Adapter
+from dspy_qwen_adapter import QwenAdapter
 
 dspy.configure(
     lm=dspy.LM(
@@ -143,7 +143,7 @@ dspy.configure(
         temperature=1.0,
         max_tokens=8192,
     ),
-    adapter=Qwen35Adapter(),
+    adapter=QwenAdapter(),
 )
 
 def get_weather(city: str) -> str:
@@ -154,7 +154,7 @@ react = dspy.ReAct("question -> answer", tools=[get_weather])
 print(react(question="What's the weather in Tokyo?").answer)
 ```
 
-That's the whole user-facing surface — instantiate `Qwen35Adapter()`, pass
+That's the whole user-facing surface — instantiate `QwenAdapter()`, pass
 it to `dspy.configure`, use `dspy.ReAct` or `dspy.Predict` as normal. No
 prompt templates, no parser configuration, no server-specific flags.
 
@@ -164,7 +164,7 @@ model and run.
 ## Configuration
 
 ```python
-Qwen35Adapter(
+QwenAdapter(
     callbacks=None,                 # list[BaseCallback] — standard DSPy callbacks
     native_response_types=None,     # list[type] — forwarded to base Adapter
     strict_parse=False,             # True: raise AdapterParseError when no tool call
@@ -194,7 +194,7 @@ different Qwen tool-parser quirks.
 
 ## How it's different
 
-| | ChatAdapter | JSONAdapter | XMLAdapter | **Qwen35Adapter** |
+| | ChatAdapter | JSONAdapter | XMLAdapter | **QwenAdapter** |
 |---|---|---|---|---|
 | Tool call format | `[[ ## field ## ]]` delimiters | JSON text (+ `response_format`) | `<field>content</field>` per output | canonical Qwen `<tool_call>` XML |
 | Trajectory replay | flat `name: value` lines | flat JSON per turn | `<field>` lines per turn | `<tool_call>` + `<tool_response name="...">` XML per turn |

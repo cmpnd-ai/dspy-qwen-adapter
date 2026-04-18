@@ -18,7 +18,7 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["dspy_qwen35_adapter"]
+packages = ["dspy_qwen_adapter"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["tests/", "harness/", "docs/", "dspy/"]

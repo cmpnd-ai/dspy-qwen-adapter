@@ -1,6 +1,6 @@
 # Benchmarks
 
-Head-to-head comparison of `Qwen35Adapter` against DSPy's stock `ChatAdapter`
+Head-to-head comparison of `QwenAdapter` against DSPy's stock `ChatAdapter`
 and `JSONAdapter` (with an LM Studio-compat shim) on a suite of ReAct
 scenarios. Two Qwen 3.5 models, three adapters, eight scenarios, five runs
 per cell — 240 runs total.
@@ -12,7 +12,7 @@ per cell — 240 runs total.
   Models are smart enough to follow whichever wire format they're prompted
   for.
 - **The real differentiators are trajectory rendering and thinking-mode
-  handling**, not tool-call format. Qwen35Adapter's canonical
+  handling**, not tool-call format. QwenAdapter's canonical
   `<tool_call>` / `<tool_response>` replay keeps the model in-distribution
   across turns; its `reasoning_content` fallback rescues turns where the
   server splits all output into a side channel.
@@ -30,7 +30,7 @@ per cell — 240 runs total.
 | Context window | 262,144 tokens (both models) |
 | Sampling | `temperature=0.0` (deterministic where possible), `max_tokens=8192` |
 | ReAct `max_iters` | 10 |
-| Adapters | `ChatAdapter` (stock), `JSONAdapter` w/ LM Studio shim (skips `response_format` since LM Studio rejects `json_object`), `Qwen35Adapter` (this package) |
+| Adapters | `ChatAdapter` (stock), `JSONAdapter` w/ LM Studio shim (skips `response_format` since LM Studio rejects `json_object`), `QwenAdapter` (this package) |
 | Runs per cell | 5 |
 | Harness | `harness/run_matrix.sh` |
 
@@ -53,7 +53,7 @@ and `ChatAdapter`.
 Columns: substring % / judge % / tool_fail per run. **parse_fail/run** in
 the commentary when nonzero.
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
@@ -66,7 +66,7 @@ the commentary when nonzero.
 
 **Takeaways on 35B:**
 
-- **qwen35 is the only adapter with zero catastrophic failures.** XMLAdapter
+- **qwen is the only adapter with zero catastrophic failures.** XMLAdapter
   — the closest stylistic cousin — has two cells where the model produces
   malformed output:
   - `s3`: 5/5 runs parse-fail. Trace shows the 35B model emits
@@ -75,22 +75,22 @@ the commentary when nonzero.
     rejects it. Our adapter sidesteps this by using Qwen-native
     `<tool_call><function=...>` format and scrubbing the `next_tool_*`
     field-name cues from ReAct's auto-generated instructions.
-  - `s_deep`: 2.20 tool_fail/run (vs qwen35 0.00) — the long chain
+  - `s_deep`: 2.20 tool_fail/run (vs qwen 0.00) — the long chain
     accumulates mis-shaped tool calls that fail at execution.
-- **qwen35 wins `s_i18n`** (100/80) vs every other adapter (chat 0/0,
+- **qwen wins `s_i18n`** (100/80) vs every other adapter (chat 0/0,
   json 40/40, xml 0/0) — multi-turn trajectory rendering with
   `<tool_response name=...>` keeps the model grounded in what each tool
   actually returned.
-- **qwen35 has the lowest `tool_fail` rate on every complex scenario.**
+- **qwen has the lowest `tool_fail` rate on every complex scenario.**
   `s_deep`: 0.00 vs chat 0.60, json 0.20, xml 2.20. Same or better task
   success with fewer wasted turns.
-- **Substring and judge agree on every cell** except qwen35 `s_i18n`
+- **Substring and judge agree on every cell** except qwen `s_i18n`
   (100/80). The 1/5 judge miss had an empty `judge_reason` — a
   judge-side parse glitch, not an adapter issue.
 
 ### qwen3.5-4b (judged)
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s1 — single tool | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
@@ -112,13 +112,13 @@ the commentary when nonzero.
   because it scrubs those field-name cues from ReAct's instructions and
   routes the ReAct output through its own `split_thought_and_call`
   parser that tolerates missing args.
-- **qwen35 wins or ties elsewhere.** `s_echo`: 100/100 vs json's
-  80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen35 is 0.00.
+- **qwen wins or ties elsewhere.** `s_echo`: 100/100 vs json's
+  80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen is 0.00.
 - **The thinking-mode empty-text trap still bites json.** JSONAdapter
   dropped to 80 on `s_echo` because one extract turn came back with
-  `text=""` and all-None outputs. Qwen35Adapter's `reasoning_content`
+  `text=""` and all-None outputs. QwenAdapter's `reasoning_content`
   fallback (commit `b41ca6d`) prevents this.
-- **qwen35 `s_i18n` 0%** — the 4B model paraphrases the mock tool's
+- **qwen `s_i18n` 0%** — the 4B model paraphrases the mock tool's
   `[translated to SPANISH]` prefix away when reporting. Not a
   production tool-calling regression; real translate tools return
   actual translated text. See finding #5 below.
@@ -128,11 +128,11 @@ the commentary when nonzero.
 Qwen 3 (not 3.5) uses a **different trained tool-call format** —
 Hermes-style `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`
 — instead of Qwen 3.5's `<tool_call><function=NAME>...</function></tool_call>`
-XML. This matrix tests how Qwen35Adapter performs on a model family it
+XML. This matrix tests how QwenAdapter performs on a model family it
 was not designed for; in-context prompting pulls the model toward the
 adapter's format despite the training mismatch.
 
-| scenario | chat | json | xml | **qwen35** |
+| scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
 | s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / **2.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
@@ -144,15 +144,15 @@ adapter's format despite the training mismatch.
 | s_i18n | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
 
 **Takeaways on Qwen 3-4B:**
-- **qwen35 has 0.00 tool_fail on every scenario.** chat/json/xml all
+- **qwen has 0.00 tool_fail on every scenario.** chat/json/xml all
   hit 1.00 – 2.00 tool_fail/run on `s_code`; json hits 2.00 on `s3` and
-  1.00 on `s_sql`; xml hits 2.00 on `s_code`. qwen35 drives the long-
+  1.00 on `s_sql`; xml hits 2.00 on `s_code`. qwen drives the long-
   chain / structured-arg scenarios cleanly even on an out-of-distribution
   model.
 - **All four adapters fail `s_echo` judge** (substring passes for
   chat/json/xml because "28" is the correct mock output, but the 4B
   model hallucinates the length reasoning in ways the judge rejects).
-  qwen35's 0% substring reflects the model computing 23 instead of 28
+  qwen's 0% substring reflects the model computing 23 instead of 28
   — a trajectory-rendering artifact specific to weak models + mock
   tools rather than a production regression.
 - **All four adapters fail `s_i18n`** — 4B models (across both Qwen 3
@@ -196,7 +196,7 @@ applies when using the server's **native function calling** path
 Even when every adapter shows 100% task success, the `tool_fail / run`
 column tells a quieter story:
 
-- **35B `s_code`**: chat 0.40, json 0.00, qwen35 0.00. ChatAdapter produced 2
+- **35B `s_code`**: chat 0.40, json 0.00, qwen 0.00. ChatAdapter produced 2
   bad tool calls across 5 runs that ReAct had to recover from. Same task
   success, but more wasted turns.
 - **35B `s10`**: json 0.20 vs others 0.00. One bad call out of five runs.
@@ -212,7 +212,7 @@ column tells a quieter story:
 |---|---|---|
 | chat | 20% | flat trajectory rendering; model echoes tool output verbatim but sometimes drops the `[translated to SPANISH]` prefix |
 | json | 0% | same plus some extract turns come back with empty `text` (see finding #4) |
-| **qwen35** | **100%** | canonical `<tool_response>...</tool_response>` wrapping in trajectory keeps the model aware of what the tool returned; answer consistently references the tool's output |
+| **qwen** | **100%** | canonical `<tool_response>...</tool_response>` wrapping in trajectory keeps the model aware of what the tool returned; answer consistently references the tool's output |
 
 The win isn't that our parser is more forgiving — it's that Qwen's trained
 multi-turn format (with `<tool_call>` on assistant turns and
@@ -233,27 +233,27 @@ This manifested in the 4B run as:
 - `json` adapter 0% on `s_i18n` and 80% on `s_echo`.
 - Any adapter can hit this on hard extract turns.
 
-`Qwen35Adapter` handles this defensively: when `text` is empty and
+`QwenAdapter` handles this defensively: when `text` is empty and
 `reasoning_content` is non-empty, it promotes the reasoning into `text`
 before parsing. Our existing `strip_think` + `split_thought_and_call`
 pipeline then runs on it and recovers any trailing tool call or answer.
 
 ### 5. The `s_i18n` flip between models is a model-capability regression, not a metric artifact
 
-On 35B, qwen35 wins `s_i18n` 100-20-0. On 4B, chat wins 100-0-0 with qwen35
+On 35B, qwen wins `s_i18n` 100-20-0. On 4B, chat wins 100-0-0 with qwen
 at 0%. An earlier version of this doc attributed the flip to the
 loose substring metric; a follow-up run with the LLM-judge metric (see
-§6) confirmed the judge **agrees with substring on 4B**: the qwen35 4B
+§6) confirmed the judge **agrees with substring on 4B**: the qwen 4B
 answer genuinely is weaker than the chat 4B answer, not just paraphrased.
 
 What's actually happening:
 
 - **35B chat** sometimes strips the mock `[translated to SPANISH]` prefix
-  when reporting (20% pass); qwen35's trajectory keeps it visible (100%).
+  when reporting (20% pass); qwen's trajectory keeps it visible (100%).
 - **4B chat** literally echoes the tool's observation including the
   prefix — a simpler-model "just copy the trajectory" behavior that
   happens to mention "Spanish."
-- **4B qwen35** paraphrases the observation away, claims the tool's
+- **4B qwen** paraphrases the observation away, claims the tool's
   English output IS the Spanish translation, and loses the context that
   a translation was attempted.
 
@@ -266,18 +266,18 @@ right answer). Adapter benefits are capability-dependent.
 
 Every cell in both model matrices (240 runs + 240 judge calls) now has
 a judge verdict alongside the substring match. The two metrics agree on
-every cell except one: **qwen35 `s_i18n` on 35B** (substring 100%,
+every cell except one: **qwen `s_i18n` on 35B** (substring 100%,
 judge 80%), where one of five runs had a judge-side parse error with an
 empty reason — judge infrastructure noise, not an adapter issue.
 
 The judge's one-sentence reasons add qualitative signal the substring can't
 provide:
 
-- **qwen35 `s_i18n` 35B (passing runs):** *"explicitly notes that the
+- **qwen `s_i18n` 35B (passing runs):** *"explicitly notes that the
   tool did not actually translate into Spanish in this mock environment,
   satisfying criterion (b)"* — the 35B model is reasoning about tool
   correctness, not just copying output.
-- **qwen35 `s_i18n` 4B (failing runs):** *"repeats the original English
+- **qwen `s_i18n` 4B (failing runs):** *"repeats the original English
   text instead of reporting a Spanish translation or noting that the tool
   did not produce Spanish output"* — pinpoints the paraphrasing regression.
 - **json `s_i18n` 4B (failing runs):** *"answer is empty"* — confirms the
@@ -323,7 +323,7 @@ model at `http://127.0.0.1:1234/v1`:
 ./harness/run_matrix.sh --runs 20 --scenarios s_i18n,s_deep
 
 # Skip adapters that are already known to pass
-./harness/run_matrix.sh --runs 5 --adapters json,qwen35
+./harness/run_matrix.sh --runs 5 --adapters json,qwen
 
 # Different model
 QWEN_MODEL=openai/qwen3.5-4b ./harness/run_matrix.sh --runs 5
