@@ -1,15 +1,13 @@
 import logging
 from typing import Any
 
-from dspy.adapters.base import Adapter
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.signatures.signature import Signature
 from dspy.utils.callback import BaseCallback
 
 from dspy_qwen35_adapter.parsing import (
     strip_think,
     split_thought_and_call,
-    coerce_args_to_schema,
 )
 from dspy_qwen35_adapter.prompts import build_system_prompt
 
@@ -47,6 +45,11 @@ def _scrub_react_format_directives(instructions: str) -> str:
 _TRAJECTORY_PREFIXES = ("thought_", "tool_name_", "tool_args_", "observation_")
 
 
+def _is_react_signature(signature: type[Signature]) -> bool:
+    """True when a signature has ReAct's three augmented output fields."""
+    return REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
+
+
 def _render_tool_call(name: str, args: dict[str, Any]) -> str:
     """Render a (tool_name, args) pair in Qwen 3.5's canonical chat-template
     XML format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>
@@ -81,11 +84,8 @@ def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
     The <tool_response> tag carries a `name` attribute identifying which
     tool produced the response. This is a slight deviation from Qwen 3.5's
     bare canonical chat template (which does not include attributes on
-    tool_response). We add it because small models (e.g. Qwen 3.5 4B)
-    otherwise lose track of which tool produced which output on the
-    extract turn, and paraphrase tool outputs away when constructing the
-    final answer. Tested empirically — see the `s_i18n` 4B regression
-    notes in docs/benchmarks.md."""
+    tool_response). We add it for debugging / multi-tool provenance; the
+    parsing side doesn't depend on it."""
     turn_idxs: list[int] = sorted({
         int(k.rsplit("_", 1)[1])
         for k in trajectory
@@ -108,12 +108,31 @@ def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-class Qwen35Adapter(Adapter):
-    """Text-native DSPy adapter for Qwen 3.5 tool calling.
+class Qwen35Adapter(XMLAdapter):
+    """DSPy adapter for Qwen 3.5 that keeps the model in its trained
+    distribution across both tool-calling and plain Predict signatures.
 
-    Bypasses the inference server's tool-call parser entirely. Prompts Qwen
-    in its trained XML format and parses tool calls out of the assistant's
-    content directly.
+    For ReAct signatures (output fields next_thought / next_tool_name /
+    next_tool_args), the adapter takes a custom `format()` path that emits
+    Qwen's canonical `<tool_call><function=...></function></tool_call>`
+    format, replays trajectories with `<tool_response name=...>` wrapping,
+    and parses tool calls out of `message.content` via
+    `split_thought_and_call`. The server's native function-call path is
+    never invoked (`use_native_function_calling=False`).
+
+    For non-ReAct signatures, the adapter inherits `XMLAdapter`'s
+    `<field>content</field>` protocol — a natural fit for Qwen's XML-heavy
+    training distribution — with the same `<think>` stripping and
+    `reasoning_content` rescue layered on top.
+
+    Defensive behaviors applied to both paths:
+      - `strip_think()` scrubs leaked `<think>...</think>` blocks.
+      - `_call_postprocess()` promotes `reasoning_content` into `text` on
+        turns where the server routed the entire completion into the
+        reasoning side channel.
+      - `strict_parse=False` (default) gracefully finishes a ReAct turn
+        when no tool call is emitted; `strict_parse=True` raises
+        `AdapterParseError` instead.
     """
 
     def __init__(
@@ -122,20 +141,107 @@ class Qwen35Adapter(Adapter):
         native_response_types: list[type] | None = None,
         strict_parse: bool = False,
     ):
-        super().__init__(
-            callbacks=callbacks,
-            use_native_function_calling=False,
-            native_response_types=native_response_types,
-        )
+        super().__init__(callbacks=callbacks)
+        # Hardcode: we never pass tools=[] to the server, regardless of
+        # whether LiteLLM claims the provider supports native function
+        # calling. This is the design contract of the adapter.
+        self.use_native_function_calling = False
+        if native_response_types is not None:
+            self.native_response_types = native_response_types
         self.strict_parse = strict_parse
+
+    # -------- format() — branch on ReAct vs plain signatures --------
+
+    def format(
+        self,
+        signature: type[Signature],
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        if _is_react_signature(signature):
+            # Custom system prompt optimized for ReAct with Qwen 3.5:
+            # scrubs ReAct's JSON directive from the auto-generated
+            # instructions, emits _REACT_GUIDANCE, optionally wraps any
+            # `tools` input as a <tools> block (usually empty in prod
+            # because ReAct embeds tool enumeration in instructions text).
+            tools = inputs.get("tools") or []
+            tool_list = tools if isinstance(tools, list) else [tools]
+            task_description = _scrub_react_format_directives(
+                signature.instructions or ""
+            )
+            system = build_system_prompt(
+                task_description=task_description,
+                tools=tool_list,
+                react_fields=True,
+            )
+            user = self.format_user_message_content(
+                signature, inputs, main_request=True
+            )
+            return [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ]
+
+        # Non-ReAct: delegate to XMLAdapter, which builds a proper
+        # system message (field description, XML-tag structure hint,
+        # task description), handles demos and `dspy.History`, and
+        # wraps inputs/outputs in `<field>content</field>` tags.
+        return super().format(signature, demos, inputs)
+
+    # -------- hooks shared between paths --------
+
+    def format_user_message_content(
+        self,
+        signature: type[Signature],
+        inputs: dict[str, Any],
+        prefix: str = "",
+        suffix: str = "",
+        main_request: bool = False,
+    ) -> str:
+        # ReAct's _format_trajectory helper calls this with a synthetic
+        # signature whose input fields are trajectory keys (thought_0,
+        # tool_name_0, ...). Render as a Qwen-native transcript.
+        if _is_react_trajectory(inputs):
+            rendered = _render_react_trajectory(inputs)
+            return (prefix + rendered + suffix).strip()
+
+        # A `tools` input field on a ReAct main-turn request is a list of
+        # Tool objects — skip it so XMLAdapter doesn't try to XML-wrap a
+        # list of Python objects. The tools themselves are already
+        # described in the system message (via build_system_prompt).
+        if "tools" in inputs and "tools" in signature.input_fields:
+            signature = signature.delete("tools")
+            inputs = {k: v for k, v in inputs.items() if k != "tools"}
+
+        return super().format_user_message_content(
+            signature, inputs, prefix=prefix, suffix=suffix, main_request=main_request
+        )
+
+    def format_assistant_message_content(
+        self,
+        signature: type[Signature],
+        outputs: dict[str, Any],
+        missing_field_message: str | None = None,
+    ) -> str:
+        if _is_react_signature(signature):
+            thought = outputs.get("next_thought", "")
+            name = outputs.get("next_tool_name", "")
+            args = outputs.get("next_tool_args", {}) or {}
+            call_xml = _render_tool_call(name, args)
+            if thought:
+                return f"{thought}\n{call_xml}"
+            return call_xml
+
+        # XMLAdapter renders outputs as <field>content</field>.
+        return super().format_assistant_message_content(
+            signature, outputs, missing_field_message=missing_field_message
+        )
 
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         cleaned = strip_think(completion)
-        thought, call = split_thought_and_call(cleaned)
 
-        has_react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
-
-        if has_react_fields:
+        if _is_react_signature(signature):
+            thought, call = split_thought_and_call(cleaned)
             if call is None:
                 if self.strict_parse:
                     from dspy.utils.exceptions import AdapterParseError
@@ -157,14 +263,8 @@ class Qwen35Adapter(Adapter):
                 "next_tool_args": args,
             }
 
-        # Non-ReAct signatures: best-effort plain-text → last output field.
-        # ChainOfThought prepends 'reasoning'; user's real answer is last.
-        output_keys = list(signature.output_fields.keys())
-        if not output_keys:
-            return {}
-        result = {k: "" for k in output_keys}
-        result[output_keys[-1]] = cleaned
-        return result
+        # Non-ReAct: XMLAdapter parses `<field>content</field>` tags.
+        return super().parse(signature, cleaned)
 
     def _call_postprocess(
         self,
@@ -179,9 +279,9 @@ class Qwen35Adapter(Adapter):
 
         Qwen 3 and 3.5 models in "thinking mode" may emit so much <think>
         content that the server's reasoning parser consumes the entire
-        completion — leaving `text=""`. DSPy's base _call_postprocess then
-        skips `parse()` entirely (base.py:136) and returns all output fields
-        as None, which kills the ReAct / extract turn.
+        completion — leaving `text=""`. DSPy's base `_call_postprocess`
+        then skips `parse()` entirely and returns all output fields as
+        `None`, which kills the ReAct / extract turn.
 
         We merge reasoning_content into text as a fallback so our parser
         still has something to work with — often the runaway reasoning
@@ -204,80 +304,3 @@ class Qwen35Adapter(Adapter):
         return super()._call_postprocess(
             processed_signature, original_signature, normalized, lm, lm_kwargs
         )
-
-    def format_field_description(self, signature: type[Signature]) -> str:
-        return signature.instructions or ""
-
-    def format_field_structure(self, signature: type[Signature]) -> str:
-        return (
-            "When calling a tool, emit a canonical Qwen tool call: "
-            "<tool_call><function=NAME><parameter=KEY>VALUE</parameter>..."
-            "</function></tool_call>. Otherwise respond in plain text."
-        )
-
-    def format_task_description(self, signature: type[Signature]) -> str:
-        return signature.instructions or ""
-
-    def format_user_message_content(
-        self,
-        signature: type[Signature],
-        inputs: dict[str, Any],
-        prefix: str = "",
-        suffix: str = "",
-        main_request: bool = False,
-    ) -> str:
-        # ReAct calls format_user_message_content(trajectory_signature, trajectory)
-        # to render the past trajectory as text to feed back to the model.
-        # When we detect that pattern, render in Qwen's canonical chat-template
-        # format: <tool_call>...</tool_call> + <tool_response>...</tool_response>.
-        if _is_react_trajectory(inputs):
-            rendered = _render_react_trajectory(inputs)
-            return (prefix + rendered + suffix).strip()
-
-        parts = []
-        for name, _field in signature.input_fields.items():
-            if name == "tools":
-                continue
-            value = inputs.get(name, "")
-            parts.append(f"{name}: {value}")
-        return (prefix + "\n\n".join(parts) + suffix).strip()
-
-    def format_assistant_message_content(
-        self,
-        signature: type[Signature],
-        outputs: dict[str, Any],
-        missing_field_message: str | None = None,
-    ) -> str:
-        has_react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
-        if has_react_fields:
-            thought = outputs.get("next_thought", "")
-            name = outputs.get("next_tool_name", "")
-            args = outputs.get("next_tool_args", {}) or {}
-            call_xml = _render_tool_call(name, args)
-            if thought:
-                return f"{thought}\n{call_xml}"
-            return call_xml
-        return "\n".join(f"{k}: {v}" for k, v in outputs.items())
-
-    def format(
-        self,
-        signature: type[Signature],
-        demos: list[dict[str, Any]],
-        inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        tools = inputs.get("tools") or []
-        tool_list = tools if isinstance(tools, list) else [tools]
-        react_fields = REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
-        task_description = _scrub_react_format_directives(
-            signature.instructions or ""
-        ) if react_fields else (signature.instructions or "")
-        system = build_system_prompt(
-            task_description=task_description,
-            tools=tool_list,
-            react_fields=react_fields,
-        )
-        user = self.format_user_message_content(signature, inputs)
-        return [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ]

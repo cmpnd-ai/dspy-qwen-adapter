@@ -129,8 +129,11 @@ def test_react_completes_with_qwen_adapter_and_dummy_lm():
             )},
             # Turn 2: finish
             {"response": "I have the answer.\n<function=finish></function>"},
-            # Extract turn: final answer as plain text
-            {"response": "Tokyo is sunny and 72F."},
+            # Extract turn: non-ReAct signature, XMLAdapter-style field tags.
+            {"response": (
+                "<reasoning>\nTokyo's weather is sunny per the tool.\n</reasoning>\n"
+                "<answer>\nTokyo is sunny and 72F.\n</answer>"
+            )},
         ]
     )
 
@@ -144,10 +147,10 @@ def test_react_completes_with_qwen_adapter_and_dummy_lm():
     assert pred.trajectory["tool_name_1"] == "finish"
 
 
-def test_parse_non_react_populates_last_output_field():
-    """Non-ReAct signatures (e.g., ChainOfThought extract) should put cleaned
-    content into the last output field — typically the user's declared answer,
-    not the ChainOfThought-prepended reasoning."""
+def test_parse_non_react_delegates_to_xml_adapter():
+    """Non-ReAct signatures (e.g., ChainOfThought extract, plain Predict)
+    go through XMLAdapter's <field>content</field> parser. strip_think
+    runs first to scrub any leaked reasoning."""
     class Sig(dspy.Signature):
         """Answer the question."""
         question: str = dspy.InputField()
@@ -155,9 +158,14 @@ def test_parse_non_react_populates_last_output_field():
         answer: str = dspy.OutputField()
 
     a = Qwen35Adapter()
-    out = a.parse(Sig, "Tokyo is sunny and 72F.")
+    completion = (
+        "<think>let me think</think>\n"
+        "<reasoning>\nTokyo has mild spring weather.\n</reasoning>\n"
+        "<answer>\nTokyo is sunny and 72F.\n</answer>"
+    )
+    out = a.parse(Sig, completion)
+    assert out["reasoning"] == "Tokyo has mild spring weather."
     assert out["answer"] == "Tokyo is sunny and 72F."
-    assert out["reasoning"] == ""
 
 
 def test_format_react_signature_emits_xml_protocol_and_drops_json_directive():
@@ -238,17 +246,24 @@ def test_format_trajectory_renders_qwen_native_transcript():
     # across the extract turn.
     assert '<tool_response name="get_weather">\nsunny, 72F\n</tool_response>' in rendered
     assert "<tool_call>\n<function=finish>\n</function>\n</tool_call>" in rendered
-    # Non-trajectory path is unchanged: plain "name: value" lines.
+    # Non-trajectory path delegates to XMLAdapter's <field>content</field>
+    # rendering — the whole point of inheriting from XMLAdapter so plain
+    # Predict signatures still have a structured output contract.
     class Plain(dspy.Signature):
         question: str = dspy.InputField()
         answer: str = dspy.OutputField()
-    assert a.format_user_message_content(Plain, {"question": "hi"}) == "question: hi"
+    plain_out = a.format_user_message_content(Plain, {"question": "hi"})
+    assert "<question>\nhi\n</question>" in plain_out
 
 
 def test_postprocess_promotes_reasoning_content_when_text_empty():
     """When LM Studio's reasoning parser routes everything into
     reasoning_content and leaves text empty, we must fall back to using
-    reasoning_content so parse() runs instead of returning all-None."""
+    reasoning_content so parse() runs instead of returning all-None.
+
+    Non-ReAct path goes through XMLAdapter.parse which needs field tags;
+    the promoted reasoning_content here includes them, simulating a turn
+    where the model emitted <answer> inside reasoning mode."""
     a = Qwen35Adapter()
 
     class Sig(dspy.Signature):
@@ -260,15 +275,14 @@ def test_postprocess_promotes_reasoning_content_when_text_empty():
     outputs = [{
         "text": "",
         "reasoning_content": (
-            "The user asked about Tokyo weather. I should say it's sunny.\n"
-            "Final answer: Tokyo is sunny."
+            "The user asked about Tokyo weather.\n"
+            "<reasoning>\nWeather lookup returned sunny.\n</reasoning>\n"
+            "<answer>\nTokyo is sunny.\n</answer>"
         ),
     }]
     values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
     assert len(values) == 1
-    # The answer is routed to the LAST output field (Task-10 fallback contract).
-    assert values[0]["answer"], "answer should be populated from reasoning_content"
-    assert "Tokyo is sunny" in values[0]["answer"]
+    assert values[0]["answer"] == "Tokyo is sunny."
 
 
 def test_postprocess_passthrough_when_text_present():
@@ -284,7 +298,10 @@ def test_postprocess_passthrough_when_text_present():
         answer: str = dspy.OutputField()
 
     outputs = [{
-        "text": "Visible answer text.",
+        "text": (
+            "<reasoning>\nVisible reasoning.\n</reasoning>\n"
+            "<answer>\nVisible answer text.\n</answer>"
+        ),
         "reasoning_content": "Hidden thinking that must NOT leak into the answer.",
     }]
     values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
