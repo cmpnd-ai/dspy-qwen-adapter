@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I need to search for users whose names contain an apostrophe. In SQL, I can use the LIKE operator with proper escaping of the apostrophe character (which is typically done by doubling it as '' in most SQL dialects). Let me execute a query to find all names containing an apostrophe.
+</next_thought>
+
+<next_tool_name>
+execute_sql
+</next_tool_name>
+
+<next_tool_args>
+{"query": "SELECT name FROM users WHERE name LIKE '%''%';"}
+</next_tool_args>

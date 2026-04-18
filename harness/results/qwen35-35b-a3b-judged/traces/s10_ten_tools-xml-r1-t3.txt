@@ -1,0 +1,13 @@
+
+
+<next_thought>
+All required information has been collected: capital (Paris), weather (cloudy, 60F), and its uppercase form (CLOUDY, 60F). The task is complete.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{"answer": "The capital of France is Paris. Its weather is CLOUDY, 60F."}
+</next_tool_args>

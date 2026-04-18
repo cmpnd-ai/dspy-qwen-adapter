@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I have received the weather information for Tokyo from the get_weather tool. The observation shows it's currently sunny with a temperature of 72F. This provides all the necessary information to answer the user's question about the weather in Tokyo. I can now finish the task and provide the complete answer.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{}
+</next_tool_args>

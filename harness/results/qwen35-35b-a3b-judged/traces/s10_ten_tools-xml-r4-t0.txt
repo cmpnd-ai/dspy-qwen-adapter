@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The question asks for three things: 1) Find the capital of France, 2) Check its weather, and 3) Return the uppercase of the weather description. I need to start by finding the capital city of France using the capital_of tool.
+</next_thought>
+
+<next_tool_name>
+capital_of
+</next_tool_name>
+
+<next_tool_args>
+{"country": "France"}
+</next_tool_args>

@@ -1,0 +1,13 @@
+
+
+<next_thought>
+To complete this task, I need to follow a sequence of steps: 1) Find the capital of France using capital_of tool, 2) Get weather for that city using get_weather, 3) Uppercase the weather string, 4) Reverse it, and 5) Count words. Let me start by finding the capital of France.
+</next_thought>
+
+<next_tool_name>
+capital_of
+</next_tool_name>
+
+<next_tool_args>
+{"country": "France"}
+</next_tool_args>

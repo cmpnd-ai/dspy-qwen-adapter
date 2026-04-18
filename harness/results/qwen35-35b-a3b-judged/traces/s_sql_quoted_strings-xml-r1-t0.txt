@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I need to search for user names containing an apostrophe. In SQL, I can use the LIKE operator with a pattern. Since apostrophe is also used in string literals, I need to escape it by doubling it (two single quotes). The pattern '%''%' will match any name containing at least one apostrophe character.
+</next_thought>
+
+<next_tool_name>
+execute_sql
+</next_tool_name>
+
+<next_tool_args>
+{"query": "SELECT name FROM users WHERE name LIKE '%''%';"}
+</next_tool_args>

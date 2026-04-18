@@ -1,0 +1,7 @@
+
+
+<next_thought>
+I need to check the current weather in Tokyo using the get_weather tool with the city parameter set to "Tokyo". This will provide the necessary information to answer the question.
+</next_thought>
+<next_tool_name>get_weather</next_tool_name>
+<next_tool_args>{"city": "Tokyo"}</next_tool_args>

@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s10_ten_tools,xml,0,4,False,0,0,True,True,"The answer exactly matches the required uppercased weather string 'CLOUDY, 60F' specified in the criterion.",
+s10_ten_tools,xml,1,4,False,0,1,True,True,"The answer includes the required uppercased weather string 'CLOUDY, 60F' as specified in the criterion.",
+s10_ten_tools,xml,2,4,False,0,0,True,True,"The answer exactly matches the required uppercased weather string 'CLOUDY, 60F' specified in the criterion.",
+s10_ten_tools,xml,3,5,False,0,1,True,True,"The answer exactly matches the required uppercased weather string 'CLOUDY, 60F' specified in the criterion.",
+s10_ten_tools,xml,4,4,False,0,0,True,True,"The answer exactly matches the required uppercased weather string 'CLOUDY, 60F' specified in the criterion.",

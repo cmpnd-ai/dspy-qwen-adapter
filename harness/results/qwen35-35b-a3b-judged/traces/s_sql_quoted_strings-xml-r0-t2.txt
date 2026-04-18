@@ -1,0 +1,9 @@
+
+
+<reasoning>
+To find users with apostrophes in their names, I used a SQL LIKE pattern '%''%' where the doubled single quotes escape the apostrophe character. This correctly matches any name containing at least one apostrophe. The query returned two matching entries: O'Brien and d'Angelo, both of which contain apostrophes as expected.
+</reasoning>
+
+<answer>
+O'Brien, d'Angelo
+</answer>

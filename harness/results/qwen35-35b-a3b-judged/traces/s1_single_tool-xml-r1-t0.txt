@@ -1,0 +1,11 @@
+
+
+<next_thought>
+I need to retrieve the current weather information for Tokyo using the available tools. Since no prior steps have been taken, I will directly call the get_weather tool with Tokyo as the city parameter.
+</next_thought>
+<next_tool_name>
+get_weather
+</next_tool_name>
+<next_tool_args>
+{"city": "Tokyo"}
+</next_tool_args>
