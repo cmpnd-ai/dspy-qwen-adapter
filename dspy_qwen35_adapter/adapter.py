@@ -76,7 +76,16 @@ def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
     observation wrapped in <tool_response>.
 
     Turns are grouped by the integer suffix on the keys (thought_0,
-    tool_name_0, etc.). Missing pieces of a turn are silently skipped."""
+    tool_name_0, etc.). Missing pieces of a turn are silently skipped.
+
+    The <tool_response> tag carries a `name` attribute identifying which
+    tool produced the response. This is a slight deviation from Qwen 3.5's
+    bare canonical chat template (which does not include attributes on
+    tool_response). We add it because small models (e.g. Qwen 3.5 4B)
+    otherwise lose track of which tool produced which output on the
+    extract turn, and paraphrase tool outputs away when constructing the
+    final answer. Tested empirically — see the `s_i18n` 4B regression
+    notes in docs/benchmarks.md."""
     turn_idxs: list[int] = sorted({
         int(k.rsplit("_", 1)[1])
         for k in trajectory
@@ -94,7 +103,8 @@ def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
         if name:
             parts.append(_render_tool_call(name, args))
         if obs is not None:
-            parts.append(f"<tool_response>\n{obs}\n</tool_response>")
+            attr = f' name="{name}"' if name else ""
+            parts.append(f"<tool_response{attr}>\n{obs}\n</tool_response>")
     return "\n".join(parts)
 
 
@@ -266,6 +276,23 @@ class Qwen35Adapter(Adapter):
             tools=tool_list,
             react_fields=react_fields,
         )
+        # Extract-turn guidance: when the signature has a pre-rendered
+        # `trajectory` input but is NOT a ReAct turn (so it's the
+        # ChainOfThought extract that produces the final answer), small
+        # models tend to paraphrase tool outputs away. Asking explicitly
+        # for verbatim reporting keeps them from cleaning up prefixes or
+        # structural markers that may carry task-relevant information.
+        is_extract_turn = (
+            not react_fields
+            and "trajectory" in signature.input_fields
+        )
+        if is_extract_turn:
+            system = (
+                (system + "\n\n" if system else "")
+                + "When your answer references information obtained from a "
+                "tool call in the trajectory, quote the tool's output "
+                "verbatim rather than paraphrasing or summarizing it."
+            )
         user = self.format_user_message_content(signature, inputs)
         return [
             {"role": "system", "content": system},

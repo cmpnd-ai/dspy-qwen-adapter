@@ -233,7 +233,10 @@ def test_format_trajectory_renders_qwen_native_transcript():
 
     assert "<tool_call>\n<function=get_weather>" in rendered
     assert "<parameter=city>\nTokyo\n</parameter>" in rendered
-    assert "<tool_response>\nsunny, 72F\n</tool_response>" in rendered
+    # The tool_response tag carries a name= attribute naming the tool that
+    # produced it — helps small models (4B) preserve tool-output provenance
+    # across the extract turn.
+    assert '<tool_response name="get_weather">\nsunny, 72F\n</tool_response>' in rendered
     assert "<tool_call>\n<function=finish>\n</function>\n</tool_call>" in rendered
     # Non-trajectory path is unchanged: plain "name: value" lines.
     class Plain(dspy.Signature):
