@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from dspy.adapters.base import Adapter as _BaseAdapter
 from dspy.adapters.xml_adapter import XMLAdapter
 from dspy.signatures.signature import Signature
 from dspy.utils.callback import BaseCallback
@@ -12,6 +13,21 @@ from dspy_qwen35_adapter.parsing import (
 from dspy_qwen35_adapter.prompts import build_system_prompt
 
 logger = logging.getLogger(__name__)
+
+# DSPy's `Adapter.__init_subclass__` wraps `format` and `parse` with
+# `with_callbacks` on every subclass. That re-wraps inherited methods: by the
+# time we reach `Qwen35Adapter`, `XMLAdapter.format` is already double-wrapped
+# (once for ChatAdapter + once for XMLAdapter), and a naive `super().format()`
+# call would emit two extra callback spans on top of our own wrapper.
+#
+# Hold direct references to the unwrapped implementations so we can invoke
+# them without dragging the extra span layers along. XMLAdapter's XML-tag
+# formatting comes from its overridden hooks (format_field_structure,
+# format_field_with_value, etc.), which are still resolved via MRO on `self`
+# — so calling `_BaseAdapter.format(self, ...)` produces XML-tagged output
+# with only one span per call.
+_ADAPTER_FORMAT = _BaseAdapter.format  # unwrapped; Adapter itself is never a subclass
+_XML_PARSE_UNWRAPPED = XMLAdapter.parse.__wrapped__
 
 REACT_TOOL_FIELDS = {"next_thought", "next_tool_name", "next_tool_args"}
 
@@ -182,11 +198,13 @@ class Qwen35Adapter(XMLAdapter):
                 {"role": "user", "content": user},
             ]
 
-        # Non-ReAct: delegate to XMLAdapter, which builds a proper
-        # system message (field description, XML-tag structure hint,
-        # task description), handles demos and `dspy.History`, and
-        # wraps inputs/outputs in `<field>content</field>` tags.
-        return super().format(signature, demos, inputs)
+        # Non-ReAct: delegate to the base Adapter.format composition.
+        # XMLAdapter's XML-tag behavior (field descriptions, structure,
+        # field_with_value) comes from its overridden hooks, which are still
+        # resolved via MRO on `self`. Calling `_ADAPTER_FORMAT` directly
+        # avoids a duplicate callback span that `super().format()` would
+        # emit (see note at top of module).
+        return _ADAPTER_FORMAT(self, signature, demos, inputs)
 
     # -------- hooks shared between paths --------
 
@@ -264,7 +282,9 @@ class Qwen35Adapter(XMLAdapter):
             }
 
         # Non-ReAct: XMLAdapter parses `<field>content</field>` tags.
-        return super().parse(signature, cleaned)
+        # Call the unwrapped implementation to avoid a duplicate callback
+        # span (see note at top of module).
+        return _XML_PARSE_UNWRAPPED(self, signature, cleaned)
 
     def _call_postprocess(
         self,
