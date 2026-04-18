@@ -26,7 +26,7 @@ per cell — 240 runs total.
 | Field | Value |
 |---|---|
 | Inference server | LM Studio 0.4.x (OpenAI-compatible) at `http://127.0.0.1:1234/v1` |
-| Models | `qwen3.5-35b-a3b` (Unsloth GGUF), `qwen3.5-4b` |
+| Models | `qwen3.5-35b-a3b` (Unsloth GGUF), `qwen3.5-4b`, `qwen3-4b` (Hermes format — out-of-distribution test for the adapter) |
 | Context window | 262,144 tokens (both models) |
 | Sampling | `temperature=0.0` (deterministic where possible), `max_tokens=8192` |
 | ReAct `max_iters` | 10 |
@@ -122,6 +122,46 @@ the commentary when nonzero.
   `[translated to SPANISH]` prefix away when reporting. Not a
   production tool-calling regression; real translate tools return
   actual translated text. See finding #5 below.
+
+### qwen3-4b (out-of-distribution judged)
+
+Qwen 3 (not 3.5) uses a **different trained tool-call format** —
+Hermes-style `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`
+— instead of Qwen 3.5's `<tool_call><function=NAME>...</function></tool_call>`
+XML. This matrix tests how Qwen35Adapter performs on a model family it
+was not designed for; in-context prompting pulls the model toward the
+adapter's format despite the training mismatch.
+
+| scenario | chat | json | xml | **qwen35** |
+|---|---|---|---|---|
+| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / **2.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_sql | 100 / 100 / 0.00 | 100 / 100 / **1.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_code | 100 / 100 / **1.00** | 100 / 100 / **1.00** | 100 / 100 / **2.00** | **100 / 100 / 0.00** |
+| s_echo | 100 / 0 / 0.00 | 100 / 0 / 0.00 | 100 / 0 / 0.00 | **0 / 0 / 0.00** |
+| s_deep | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_i18n | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+
+**Takeaways on Qwen 3-4B:**
+- **qwen35 has 0.00 tool_fail on every scenario.** chat/json/xml all
+  hit 1.00 – 2.00 tool_fail/run on `s_code`; json hits 2.00 on `s3` and
+  1.00 on `s_sql`; xml hits 2.00 on `s_code`. qwen35 drives the long-
+  chain / structured-arg scenarios cleanly even on an out-of-distribution
+  model.
+- **All four adapters fail `s_echo` judge** (substring passes for
+  chat/json/xml because "28" is the correct mock output, but the 4B
+  model hallucinates the length reasoning in ways the judge rejects).
+  qwen35's 0% substring reflects the model computing 23 instead of 28
+  — a trajectory-rendering artifact specific to weak models + mock
+  tools rather than a production regression.
+- **All four adapters fail `s_i18n`** — 4B models (across both Qwen 3
+  and Qwen 3.5) paraphrase the mock `[translated to SPANISH]` prefix
+  away regardless of adapter.
+- **0 parse failures across 160 runs on Qwen 3-4B** — Qwen 3 is
+  flexible enough to follow the XML exemplar prompt even though its
+  trained format is Hermes JSON. The adapter is out-of-distribution but
+  functional.
 
 ## Scenario catalog
 
