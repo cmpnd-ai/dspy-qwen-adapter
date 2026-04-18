@@ -1,0 +1,9 @@
+
+
+Based on my analysis:
+
+**Capital of France:** Paris
+
+**Weather in Paris:** CLOUDY, 60F
+
+The weather description in uppercase is **CLOUDY, 60F**.

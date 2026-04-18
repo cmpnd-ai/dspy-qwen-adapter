@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_deep_trajectory,qwen35,0,6,False,0,0,True,True,The candidate answer correctly follows the specified chain of operations and reports the number 2 as the final value.,
+s_deep_trajectory,qwen35,1,6,False,0,0,True,True,The candidate answer correctly follows the specified chain of operations and reports the number 2 as the final value.,
+s_deep_trajectory,qwen35,2,6,False,0,0,True,True,The candidate answer correctly follows the specified chain of operations and reports the number 2 as the final value.,
+s_deep_trajectory,qwen35,3,6,False,0,0,True,True,The candidate answer correctly follows the specified chain of operations and reports the number 2 as the final value.,
+s_deep_trajectory,qwen35,4,6,False,0,0,True,True,The candidate answer correctly follows the specified chain of operations and reports the number 2 as the final value.,

@@ -1,0 +1,11 @@
+
+
+I need to search for information about who created Python to find the creation year, then calculate that year plus 10.
+
+<tool_call>
+<function=search>
+<parameter=query>
+who created Python programming language
+</parameter>
+</function>
+</tool_call>

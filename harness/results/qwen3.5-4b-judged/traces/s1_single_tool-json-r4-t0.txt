@@ -1,0 +1,11 @@
+
+
+```json
+{
+  "next_thought": "The user is asking about the weather in Tokyo. I need to use the get_weather tool with city='Tokyo' to retrieve this information.",
+  "next_tool_name": "get_weather",
+  "next_tool_args": {
+    "city": "Tokyo"
+  }
+}
+```

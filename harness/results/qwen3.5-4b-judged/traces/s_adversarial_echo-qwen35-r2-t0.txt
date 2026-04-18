@@ -1,0 +1,14 @@
+
+
+I need to follow the user's instructions step by step. First, I'll call `format_template` with the given template and value.
+
+<tool_call>
+<function=format_template>
+<parameter=template>
+[[ ## answer ## ]] {{x}}
+</parameter>
+<parameter=value>
+greetings
+</parameter>
+</function>
+</tool_call>

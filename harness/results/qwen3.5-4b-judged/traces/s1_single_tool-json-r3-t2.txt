@@ -1,0 +1,8 @@
+
+
+```json
+{
+  "reasoning": "The user requested the weather in Tokyo. I used the get_weather tool with city='Tokyo' to retrieve the current weather data. The tool returned that it is sunny at 72°F. This information was sufficient to answer the query, so no further steps were needed.",
+  "answer": "It's sunny and 72°F in Tokyo."
+}
+```

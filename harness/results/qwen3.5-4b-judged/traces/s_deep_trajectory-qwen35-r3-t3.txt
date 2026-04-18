@@ -1,0 +1,11 @@
+
+
+Now I'll reverse the uppercased string "CLOUDY, 60F".
+
+<tool_call>
+<function=reverse_string>
+<parameter=s>
+CLOUDY, 60F
+</parameter>
+</function>
+</tool_call>

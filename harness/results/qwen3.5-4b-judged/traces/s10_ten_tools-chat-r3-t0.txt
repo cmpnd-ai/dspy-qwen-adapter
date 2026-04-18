@@ -1,0 +1,10 @@
+
+
+[[ ## next_thought ## ]]
+I need to answer a multi-step question: find the capital of France, check its weather, and return the uppercase version of the weather description. Let me start by finding out what the capital city of France is using the capital_of tool.
+
+[[ ## next_tool_name ## ]]
+capital_of
+
+[[ ## next_tool_args ## ]]
+{"country": "France"}

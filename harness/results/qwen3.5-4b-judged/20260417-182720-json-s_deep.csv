@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_deep_trajectory,json,0,6,False,0,0,True,True,The answer correctly reports the required word count of 2 as specified in the criterion.,
+s_deep_trajectory,json,1,6,False,0,0,True,True,The answer correctly reports the required word count of 2 as specified in the criterion.,
+s_deep_trajectory,json,2,6,False,0,0,True,True,The answer correctly reports the required word count of 2 as specified in the criterion.,
+s_deep_trajectory,json,3,6,False,0,0,True,True,The answer correctly reports the required word count of 2 as specified in the criterion.,
+s_deep_trajectory,json,4,6,False,0,0,True,True,The answer correctly reports the required word count of 2 as specified in the criterion.,

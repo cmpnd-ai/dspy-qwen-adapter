@@ -9,3 +9,4 @@ harness/results/*.csv
 harness/traces/*.txt
 !harness/results/.gitkeep
 !harness/traces/.gitkeep
+.gitignore

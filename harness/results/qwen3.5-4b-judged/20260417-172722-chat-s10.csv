@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s10_ten_tools,chat,0,4,False,0,0,True,True,The answer correctly includes the uppercased weather string for Paris as specified in the criterion.,
+s10_ten_tools,chat,1,4,False,0,0,True,True,The answer correctly includes the uppercased weather string for Paris as specified in the criterion.,
+s10_ten_tools,chat,2,4,False,0,0,True,True,The answer correctly includes the uppercased weather string for Paris as specified in the criterion.,
+s10_ten_tools,chat,3,4,False,0,0,True,True,The answer correctly includes the uppercased weather string for Paris as specified in the criterion.,
+s10_ten_tools,chat,4,4,False,0,0,True,True,The answer correctly includes the uppercased weather string for Paris as specified in the criterion.,

@@ -3,11 +3,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dspy-qwen35-adapter"
+name = "dspy-qwen-adapter"
 version = "0.1.0"
-description = "DSPy adapter for Qwen 3.5 tool calling on OpenAI-compatible local servers"
+description = "DSPy adapter for Qwen 3.5 and 3.6 recommended formatting"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
     "dspy>=3.1",

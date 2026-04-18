@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+I now have all the information needed to answer the question. The weather in Tokyo is sunny at 72F, so I can mark this task as complete.
+
+[[ ## next_tool_name ## ]]
+finish
+
+[[ ## next_tool_args ## ]]
+{}
+
+[[ ## completed ## ]]

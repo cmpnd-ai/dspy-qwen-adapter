@@ -1,0 +1,11 @@
+
+
+I need to check Tokyo's weather using the available tools.
+
+<tool_call>
+<function=get_weather>
+<parameter=city>
+Tokyo
+</parameter>
+</function>
+</tool_call>

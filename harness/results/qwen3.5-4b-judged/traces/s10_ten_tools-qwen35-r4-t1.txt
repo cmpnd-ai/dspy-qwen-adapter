@@ -1,0 +1,11 @@
+
+
+The capital of France is Paris. Now I'll check the weather in Paris.
+
+<tool_call>
+<function=get_weather>
+<parameter=city>
+Paris
+</parameter>
+</function>
+</tool_call>

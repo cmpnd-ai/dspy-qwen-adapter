@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_code_write_and_run,json,0,3,False,0,0,True,True,The answer correctly reports the function's return value and includes the exact required string literal as specified in the criterion.,
+s_code_write_and_run,json,1,3,False,0,0,True,True,The answer correctly reports the function's return value and includes the exact required string literal as specified in the criterion.,
+s_code_write_and_run,json,2,3,False,0,0,True,True,The answer correctly reports the function's return value and includes the exact required string literal as specified in the criterion.,
+s_code_write_and_run,json,3,3,False,0,0,True,True,The answer correctly reports the function's return value and includes the exact required string literal as specified in the criterion.,
+s_code_write_and_run,json,4,3,False,0,0,True,True,The answer correctly reports the function's return value and includes the exact required string literal as specified in the criterion.,
