@@ -50,27 +50,43 @@ and `ChatAdapter`.
 
 ### qwen3.5-35b-a3b (judged)
 
-| scenario | chat | json | **qwen35** |
-|---|---|---|---|
-| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.80 | **100 / 100 / 0.00** |
-| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_echo — adversarial delimiters | 100 / 100 / 0.00 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
-| s_deep — 8-step chain | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
-| **s_i18n — multilingual arg** | **0 / 0 / 0.00** | **40 / 40 / 0.00** | **100 / 80 / 0.00** |
+Columns: substring % / judge % / tool_fail per run. **parse_fail/run** in
+the commentary when nonzero.
+
+| scenario | chat | json | xml | **qwen35** |
+|---|---|---|---|---|
+| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
+| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.80 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
+| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_echo — adversarial delimiters | 100 / 100 / 0.00 | 100 / 100 / 0.40 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
+| s_deep — 8-step chain | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **80 / 80 / 2.20** *(parse_fail 0.20)* | **100 / 100 / 0.00** |
+| **s_i18n — multilingual arg** | **0 / 0 / 0.00** | **40 / 40 / 0.00** | **0 / 0 / 0.00** | **100 / 80 / 0.00** |
 
 **Takeaways on 35B:**
+
+- **qwen35 is the only adapter with zero catastrophic failures.** XMLAdapter
+  — the closest stylistic cousin — has two cells where the model produces
+  malformed output:
+  - `s3`: 5/5 runs parse-fail. Trace shows the 35B model emits
+    `<next_tool_name>search</next_tool_args>` (wrong close tag) and raw
+    JSON for args. XMLAdapter's strict `<field>content</field>` parser
+    rejects it. Our adapter sidesteps this by using Qwen-native
+    `<tool_call><function=...>` format and scrubbing the `next_tool_*`
+    field-name cues from ReAct's auto-generated instructions.
+  - `s_deep`: 2.20 tool_fail/run (vs qwen35 0.00) — the long chain
+    accumulates mis-shaped tool calls that fail at execution.
+- **qwen35 wins `s_i18n`** (100/80) vs every other adapter (chat 0/0,
+  json 40/40, xml 0/0) — multi-turn trajectory rendering with
+  `<tool_response name=...>` keeps the model grounded in what each tool
+  actually returned.
+- **qwen35 has the lowest `tool_fail` rate on every complex scenario.**
+  `s_deep`: 0.00 vs chat 0.60, json 0.20, xml 2.20. Same or better task
+  success with fewer wasted turns.
 - **Substring and judge agree on every cell** except qwen35 `s_i18n`
-  (100/80). The 1/5 judge miss had an empty `judge_reason` — a judge-side
-  parse glitch, not an adapter issue.
-- **qwen35 is the only adapter that wins `s_i18n`** (100/80 vs chat 0/0,
-  json 40/40) — the multi-turn trajectory rendering helps the model
-  recognize the mock tool's behavior.
-- **qwen35 has the lowest `tool_fail` on every complex scenario.**
-  `s_deep`: 0.00 vs chat 0.60, json 0.20. Same task success, fewer
-  wasted turns.
+  (100/80). The 1/5 judge miss had an empty `judge_reason` — a
+  judge-side parse glitch, not an adapter issue.
 
 ### qwen3.5-4b (judged)
 

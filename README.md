@@ -71,20 +71,26 @@ trace analysis.)*
 
 ### Headline findings
 
-- **Fewer tool-call failures than either alternative on every complex
-  scenario.** `qwen35` averaged **0.00 tool_fail/run** on `s_deep` (8-step
-  chain) and `s10` on both models; `chat` spiked to 0.60-1.00 and `json`
-  to 0.20-0.80 on the same cells. Same task success, fewer wasted turns.
+- **Only adapter with zero catastrophic failures across all scenarios.**
+  XMLAdapter — the closest stylistic cousin — fails `s3` 5/5 runs
+  (parse_fail 1.00) because the 35B model emits mixed `<next_tool_name>`
+  and raw JSON that XMLAdapter's strict parser rejects. Our adapter
+  scrubs those field-name cues from ReAct's instructions and uses
+  Qwen-native `<tool_call>` XML instead.
+- **Fewer tool-call failures than any alternative on every complex
+  scenario.** `qwen35` averaged **0.00 tool_fail/run** on `s_deep`
+  (8-step chain) and `s10` on both models; chat / json / xml spike to
+  0.20 – 2.20 on the same cells. Same task success, fewer wasted turns.
 - **Only adapter that reliably handles multilingual / delimiter-leaking
-  tool output.** `s_i18n` on 35B: `qwen35` 100%, chat 0%, json 40%.
+  tool output.** `s_i18n` on 35B: `qwen35` 100%, chat 0%, json 40%,
+  xml 0%.
 - **Rescues `reasoning_content` turns that silently break stock
   adapters.** On the 4B model with thinking mode, extract turns sometimes
   come back with `text=""` and all output fields `None`. `json` lost a
   run on `s_echo` this way; `qwen35` caught it via the
   `reasoning_content` fallback.
-- **0 parse failures across 480 total runs** on both models. Parse
-  robustness is a non-issue for any adapter on Qwen 3.5; the
-  differentiators are trajectory rendering and thinking-mode handling.
+- **0 parse failures across 600 total runs on qwen35**; XMLAdapter had
+  1.00/run on `s3` and 0.20/run on `s_deep` over the same scenarios.
 
 ## Install
 
