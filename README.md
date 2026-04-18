@@ -75,13 +75,18 @@ methodology, per-cell reasoning, and limitations.
 | s_deep | 100% | 100% | **80%** ⚠ | **100%** |
 | **s_i18n** | **0%** | 40% | 0% | **80%** |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s10 | — | 0.80 | 0.40 |
-| s_echo | — | 0.40 | 0.20 |
-| s_deep | 0.60 | 0.20 | **2.20** |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s10 | 0.00 | 0.80 | 0.40 | **0.00** |
+| s_sql | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_code | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_echo | 0.00 | 0.40 | 0.20 | **0.00** |
+| s_deep | 0.60 | 0.20 | **2.20** | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
 ### qwen3.5-4b
 
@@ -98,12 +103,18 @@ methodology, per-cell reasoning, and limitations.
 | s_deep | 100% | 100% | 100% | **100%** |
 | s_i18n | 100% | 0% | 0% | 0% |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s1 | **1.00** | — | — |
-| s_deep | **1.00** | — | — |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | **1.00** | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s10 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_sql | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_code | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_echo | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_deep | **1.00** | 0.00 | 0.00 | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
 ### qwen3-4b (out-of-distribution — Hermes-format model)
 
@@ -124,13 +135,18 @@ tests whether in-context compliance bridges the distribution gap.
 | s_deep | 100% | 100% | 100% | **100%** |
 | s_i18n | 0% | 0% | 0% | 0% |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s3 | — | **2.00** | — |
-| s_sql | — | 1.00 | — |
-| s_code | 1.00 | 1.00 | **2.00** |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | **2.00** | 0.00 | **0.00** |
+| s10 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_sql | 0.00 | 1.00 | 0.00 | **0.00** |
+| s_code | 1.00 | 1.00 | **2.00** | **0.00** |
+| s_echo | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_deep | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
 *(s_echo and s_i18n failures across all adapters on 4B-class models are
 weak-model + mock-tool artifacts — the model hallucinates lengths or

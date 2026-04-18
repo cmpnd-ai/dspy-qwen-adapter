@@ -75,15 +75,20 @@ and `ChatAdapter`.
 | s_deep — 8-step chain | 100% | 100% | **80%** ⚠ | **100%** |
 | **s_i18n — multilingual arg** | **0%** | **40%** | **0%** | **80%** |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s10 | — | 0.80 | 0.40 |
-| s_echo | — | 0.40 | 0.20 |
-| s_deep | 0.60 | 0.20 | **2.20** |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s10 | 0.00 | 0.80 | 0.40 | **0.00** |
+| s_sql | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_code | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_echo | 0.00 | 0.40 | 0.20 | **0.00** |
+| s_deep | 0.60 | 0.20 | **2.20** | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
-**Parse failures**: xml 1.00/run on `s3`, 0.20/run on `s_deep`. qwen, chat, json all 0.00.
+**Parse failures**: xml 1.00/run on `s3`, 0.20/run on `s_deep`. chat, json, qwen all 0.00.
 
 **Takeaways on 35B:**
 
@@ -125,14 +130,20 @@ and `ChatAdapter`.
 | s_deep — 8-step chain | 100% | 100% | 100% | **100%** |
 | s_i18n — multilingual arg | 100% | 0% | 0% | 0% |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s1 | **1.00** | — | — |
-| s_deep | **1.00** | — | — |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | **1.00** | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s10 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_sql | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_code | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_echo | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_deep | **1.00** | 0.00 | 0.00 | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
-**Parse failures**: xml 1.00/run on `s_code`. qwen, chat, json all 0.00.
+**Parse failures**: xml 1.00/run on `s_code`. chat, json, qwen all 0.00.
 
 **Takeaways on 4B:**
 - **Substring and judge agree on every cell.**
@@ -179,13 +190,18 @@ adapter's format despite the training mismatch.
 | s_deep | 100% | 100% | 100% | **100%** |
 | s_i18n | 0% | 0% | 0% | 0% |
 
-**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+**Tool-fail / run**
 
-| scenario | chat | json | xml |
-|---|---|---|---|
-| s3 | — | **2.00** | — |
-| s_sql | — | 1.00 | — |
-| s_code | 1.00 | 1.00 | **2.00** |
+| scenario | chat | json | xml | **qwen** |
+|---|---|---|---|---|
+| s1 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s3 | 0.00 | **2.00** | 0.00 | **0.00** |
+| s10 | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_sql | 0.00 | 1.00 | 0.00 | **0.00** |
+| s_code | 1.00 | 1.00 | **2.00** | **0.00** |
+| s_echo | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_deep | 0.00 | 0.00 | 0.00 | **0.00** |
+| s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
 **Parse failures**: all adapters 0.00 — Qwen 3 follows the prompt exemplar despite training on a different format.
 
