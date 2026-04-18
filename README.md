@@ -9,7 +9,7 @@ vLLM, llama.cpp, Ollama, SGLang.
 
 Qwen's tool-calling wire format **changes across generations**:
 
-- **Qwen 3** (base): Hermes-style — `<tool_call>{"name": "...",
+- **Qwen 3** (base): [Hermes-style](https://qwen.readthedocs.io/en/latest/framework/function_call.html) — `<tool_call>{"name": "...",
   "arguments": {...}}</tool_call>`. vLLM's `--tool-call-parser hermes`.
 - **Qwen 3.5 / 3-Coder lineage**: XML — `<tool_call><function=NAME><parameter=K>\nVALUE\n</parameter>...</function></tool_call>`.
   vLLM's `--tool-call-parser qwen3_coder`.
