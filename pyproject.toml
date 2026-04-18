@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dspy-qwen-adapter"
-version = "0.1.0"
+version = "0.0.1"
 description = "A drop-in DSPy adapter for reliable tool calling across the Qwen 3+ family."
 readme = "README.md"
 requires-python = ">=3.12"
