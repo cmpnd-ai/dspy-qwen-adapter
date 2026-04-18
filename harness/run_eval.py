@@ -68,6 +68,9 @@ def build_adapter(name: str):
         return dspy.ChatAdapter()
     if name == "json":
         return _LMStudioJSONAdapter()
+    if name == "xml":
+        from dspy.adapters.xml_adapter import XMLAdapter
+        return XMLAdapter()
     if name == "qwen35":
         return Qwen35Adapter()
     raise ValueError(f"unknown adapter: {name}")
@@ -266,7 +269,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--adapter",
         required=True,
-        choices=["chat", "json", "qwen35"],
+        choices=["chat", "json", "xml", "qwen35"],
         help="Which adapter to evaluate.",
     )
     p.add_argument(
