@@ -39,31 +39,63 @@ Raw CSVs + captured LM traces for every run are archived under
 
 ## Results
 
-### qwen3.5-35b-a3b
+Columns: `substring % / judge % / tool_fail per run`. Substring is the
+cheap-heuristic match against `golden_answer_substring`; judge is the
+LLM-judge verdict against `judge_criterion`; tool_fail is the average
+number of `"Execution error"` observations per run.
 
-| scenario | chat (succ / tool_fail) | json (succ / tool_fail) | **qwen35** (succ / tool_fail) |
+The judge used the same local Qwen 3.5 model the adapter was being tested
+against (self-judging — see Limitations). Judge calls use `temperature=0.0`
+and `ChatAdapter`.
+
+### qwen3.5-35b-a3b (judged)
+
+| scenario | chat | json | **qwen35** |
 |---|---|---|---|
-| s1 — single tool | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s3 — three tools | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s10 — ten tools | 100% / 0.00 | 100% / 0.20 | **100% / 0.00** |
-| s_sql — quoted SQL strings | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s_code — Python write + run | 100% / 0.40 | 100% / 0.00 | **100% / 0.00** |
-| s_echo — adversarial delimiters | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s_deep — 8-step chain | 100% / 1.00 | 100% / 1.00 | **100% / 1.00** |
-| **s_i18n — multilingual arg** | **20% / 0.00** | **0% / 0.00** | **100% / 0.00** |
+| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.80 | **100 / 100 / 0.00** |
+| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_echo — adversarial delimiters | 100 / 100 / 0.00 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
+| s_deep — 8-step chain | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
+| **s_i18n — multilingual arg** | **0 / 0 / 0.00** | **40 / 40 / 0.00** | **100 / 80 / 0.00** |
 
-### qwen3.5-4b
+**Takeaways on 35B:**
+- **Substring and judge agree on every cell** except qwen35 `s_i18n`
+  (100/80). The 1/5 judge miss had an empty `judge_reason` — a judge-side
+  parse glitch, not an adapter issue.
+- **qwen35 is the only adapter that wins `s_i18n`** (100/80 vs chat 0/0,
+  json 40/40) — the multi-turn trajectory rendering helps the model
+  recognize the mock tool's behavior.
+- **qwen35 has the lowest `tool_fail` on every complex scenario.**
+  `s_deep`: 0.00 vs chat 0.60, json 0.20. Same task success, fewer
+  wasted turns.
 
-| scenario | chat (succ / tool_fail) | json (succ / tool_fail) | **qwen35** (succ / tool_fail) |
+### qwen3.5-4b (judged)
+
+| scenario | chat | json | **qwen35** |
 |---|---|---|---|
-| s1 — single tool | 100% / 1.00 | 100% / 0.00 | **100% / 0.00** |
-| s3 — three tools | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s10 — ten tools | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s_sql — quoted SQL strings | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s_code — Python write + run | 100% / 0.00 | 100% / 0.00 | **100% / 0.00** |
-| s_echo — adversarial delimiters | 100% / 0.00 | **80% / 0.00** | **100% / 0.00** |
-| s_deep — 8-step chain | 100% / 1.00 | 100% / 0.00 | **100% / 0.00** |
-| s_i18n — multilingual arg | 100% / 0.00 | 0% / 0.00 | 0% / 0.00 |
+| s1 — single tool | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_echo — adversarial delimiters | 100 / 100 / 0.00 | **80 / 80 / 0.00** | **100 / 100 / 0.00** |
+| s_deep — 8-step chain | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_i18n — multilingual arg | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+
+**Takeaways on 4B:**
+- **Substring and judge agree on every cell**, including the qwen35
+  `s_i18n` 0% — the judge confirms this isn't a metric artifact but a
+  real regression: our trajectory replay causes the weaker 4B model to
+  paraphrase away the context that a translation was attempted.
+- **qwen35 wins or ties elsewhere.** `s_echo`: 100/100 vs json's
+  80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen35 is 0.00.
+- **The thinking-mode empty-text trap still bites json.** JSONAdapter
+  dropped to 80 on `s_echo` because one extract turn came back with
+  `text=""` and all-None outputs. Qwen35Adapter's `reasoning_content`
+  fallback (commit `b41ca6d`) prevents this.
 
 ## Scenario catalog
 
@@ -164,22 +196,32 @@ The takeaway: the adapter's cleaner trajectory rendering is a win on the
 (the paraphrase is too aggressive for a weak model to reconstruct the
 right answer). Adapter benefits are capability-dependent.
 
-### 6. LLM-judge validation confirms the substring metric is directionally correct
+### 6. LLM-judge validates the substring metric at scale
 
-We re-ran a narrow slice (4B, `s_i18n`, 3 runs per adapter) with an
-LLM-judge metric against per-scenario rubrics (`Scenario.judge_criterion`).
-Results aligned perfectly with the substring match — chat 100/100, json
-0/0, qwen35 0/0 — but the judge's one-sentence reasons are more
-informative:
+Every cell in both model matrices (240 runs + 240 judge calls) now has
+a judge verdict alongside the substring match. The two metrics agree on
+every cell except one: **qwen35 `s_i18n` on 35B** (substring 100%,
+judge 80%), where one of five runs had a judge-side parse error with an
+empty reason — judge infrastructure noise, not an adapter issue.
 
-- json's "answer is empty" reason pinpoints the thinking-mode empty-text
-  failure mode (finding #4).
-- qwen35's "repeats the original English text instead of reporting a
-  Spanish translation" reason pinpoints the paraphrasing regression
-  described above.
+The judge's one-sentence reasons add qualitative signal the substring can't
+provide:
 
-Full cross-model rerun with the judge is future work; see `--use-judge`
-in the harness docs.
+- **qwen35 `s_i18n` 35B (passing runs):** *"explicitly notes that the
+  tool did not actually translate into Spanish in this mock environment,
+  satisfying criterion (b)"* — the 35B model is reasoning about tool
+  correctness, not just copying output.
+- **qwen35 `s_i18n` 4B (failing runs):** *"repeats the original English
+  text instead of reporting a Spanish translation or noting that the tool
+  did not produce Spanish output"* — pinpoints the paraphrasing regression.
+- **json `s_i18n` 4B (failing runs):** *"answer is empty"* — confirms the
+  thinking-mode empty-text failure path (finding #4).
+
+A stronger/independent judge (e.g., a frontier API model) would be more
+credible than the same-model self-judging used here, but the cross-cell
+agreement with substring — especially on cells where we expected the judge
+to disagree — is evidence that the substring metric was directionally
+correct for this task set.
 
 ## Limitations and threats to validity
 
