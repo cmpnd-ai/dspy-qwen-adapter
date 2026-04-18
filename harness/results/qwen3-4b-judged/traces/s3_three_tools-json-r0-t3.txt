@@ -1,0 +1,9 @@
+
+
+{
+  "next_thought": "The year Python was created is 1991. Adding 10 gives 2001.",
+  "next_tool_name": "calculator",
+  "next_tool_args": {
+    "expression": "1991 + 10"
+  }
+}

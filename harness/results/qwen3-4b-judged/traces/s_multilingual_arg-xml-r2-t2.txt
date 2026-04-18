@@ -1,0 +1,9 @@
+
+
+<reasoning>
+The translation tool processed the input text and preserved all punctuation marks as required. The translated text is provided verbatim, maintaining the original structure and emphasis.
+</reasoning>
+
+<answer>
+It's a beautiful day — she said, “hello!” The café is open.
+</answer>

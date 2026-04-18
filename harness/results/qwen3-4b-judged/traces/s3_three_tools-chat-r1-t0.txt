@@ -1,0 +1,10 @@
+
+
+[[ ## next_thought ## ]]
+I need to find out who created Python first. Then, determine the year it was created and add 10 to that year.
+
+[[ ## next_tool_name ## ]]
+search
+
+[[ ## next_tool_args ## ]]
+{"query": "who created Python"}

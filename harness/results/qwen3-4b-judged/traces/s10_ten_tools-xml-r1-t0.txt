@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The user is asking for three things: the capital of France, the weather in that capital, and the uppercase version of the weather description. First, I need to find the capital of France using the 'capital_of' tool.
+</next_thought>
+
+<next_tool_name>
+capital_of
+</next_tool_name>
+
+<next_tool_args>
+{"country": "France"}
+</next_tool_args>

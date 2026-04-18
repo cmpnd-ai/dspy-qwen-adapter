@@ -1,0 +1,11 @@
+
+
+I need to query the users table for names containing an apostrophe. The SQL query should select names where the name column contains an apostrophe, properly escaped in SQL.
+
+<tool_call>
+<function=execute_sql>
+<parameter=query>
+SELECT "name" FROM users WHERE "name" LIKE '%''%';
+</parameter>
+</function>
+</tool_call>

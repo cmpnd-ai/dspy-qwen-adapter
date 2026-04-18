@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The tasks have been completed: the capital of France is Paris, the weather there is cloudy and 60F, and the uppercase version of the weather description is CLOUDY, 60F. All required steps are done.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{}
+</next_tool_args>

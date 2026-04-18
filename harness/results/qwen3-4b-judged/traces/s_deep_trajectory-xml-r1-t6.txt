@@ -1,0 +1,9 @@
+
+
+<reasoning>
+The capital of France is Paris. The weather for Paris is "cloudy, 60F". Uppercasing this gives "CLOUDY, 60F". Reversing the string results in "F06 ,YDUOLC". Counting the words in the reversed string yields 2.
+</reasoning>
+
+<answer>
+2
+</answer>

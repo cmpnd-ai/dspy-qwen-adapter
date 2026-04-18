@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "The translation has been completed and the text is ready to be reported as per the request.",
+  "next_tool_name": "finish",
+  "next_tool_args": {}
+}

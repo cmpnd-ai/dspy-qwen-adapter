@@ -1,0 +1,14 @@
+
+
+I need to call format_template with the given parameters, then pass the result to inspect_text to get the length.
+
+<tool_call>
+<function=format_template>
+<parameter=template>
+[[ ## answer ## ]]
+</parameter>
+<parameter=value>
+greetings
+</parameter>
+</function>
+</tool_call>

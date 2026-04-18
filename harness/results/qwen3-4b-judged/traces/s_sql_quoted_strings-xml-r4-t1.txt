@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The SQL query executed successfully and returned two users: O'Brien and d'Angelo. These are the names containing apostrophes as requested. The task is complete.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{}
+</next_tool_args>

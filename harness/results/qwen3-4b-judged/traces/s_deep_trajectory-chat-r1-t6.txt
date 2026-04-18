@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+The capital of France is Paris. The weather for Paris is "cloudy, 60F". Uppercasing this gives "CLOUDY, 60F". Reversing the string results in "F06 ,YDUOLC", which contains 2 words.
+
+[[ ## answer ## ]]
+2
+
+[[ ## completed ## ]]

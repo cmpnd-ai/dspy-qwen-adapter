@@ -1,0 +1,12 @@
+
+
+<next_thought>
+Now that I know the capital of France is Paris, I need to check the weather there. Once I have the weather description, I'll uppercase it as per the request.
+</next_thought>
+<tool_call>
+<function=get_weather>
+<parameter=city>
+Paris
+</parameter>
+</function>
+</tool_call>

@@ -1,0 +1,9 @@
+
+
+<reasoning>
+The capital of France is Paris. The weather in Paris is "cloudy, 60F". The uppercase version of the weather description is "CLOUDY, 60F".
+</reasoning>
+
+<answer>
+CLOUDY, 60F
+</answer>

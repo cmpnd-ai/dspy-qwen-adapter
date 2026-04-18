@@ -1,0 +1,16 @@
+
+
+<next_thought>
+Call the format_template tool to replace {{x}} with "greetings" in the template "[[ ## answer ## ]] {{x}}", then pass the resulting string to inspect_text to get its length.
+</next_thought>
+
+<next_tool_name>
+format_template
+</next_tool_name>
+
+<next_tool_args>
+{
+  "template": "[[ ## answer ## ]] {{x}}",
+  "value": "greetings"
+}
+</next_tool_args>

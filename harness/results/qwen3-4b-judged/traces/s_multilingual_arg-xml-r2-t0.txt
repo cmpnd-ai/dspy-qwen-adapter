@@ -1,0 +1,16 @@
+
+
+<next_thought>
+Translate the provided English text into Spanish while preserving all punctuation marks. The input includes an em dash, double quotes, and an exclamation point, which must be retained in the translation.
+</next_thought>
+
+<next_tool_name>
+translate
+</next_tool_name>
+
+<next_tool_args>
+{
+  "text": "It's a beautiful day — she said, “hello!” The café is open.",
+  "to": "Spanish"
+}
+</next_tool_args>

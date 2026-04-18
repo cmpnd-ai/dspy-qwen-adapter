@@ -1,0 +1,10 @@
+
+
+<reasoning>
+The SQL query executed successfully and returned two names containing apostrophes: O'Brien and d'Angelo. These are the desired results.
+</reasoning>
+
+<answer>
+O'Brien
+d'Angelo
+</answer>

@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+First, I need to determine the capital of France to check the weather there. The capital of France is Paris.
+
+[[ ## next_tool_name ## ]]
+capital_of
+
+[[ ## next_tool_args ## ]]
+{"country": "France"}
+
+[[ ## completed ## ]]

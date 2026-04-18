@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The weather in Tokyo is sunny with a temperature of 72F. All necessary information has been retrieved to answer the question.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{}
+</next_tool_args>

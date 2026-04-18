@@ -1,0 +1,7 @@
+
+
+{
+  "next_thought": "Next, I need to retrieve the weather for Paris, the capital of France.",
+  "next_tool_name": "get_weather",
+  "next_tool_args": {"city": "Paris"}
+}

@@ -1,0 +1,10 @@
+
+
+I need to find out who created Python and the year it was created. First, I'll search for the creator of Python.
+<tool_call>
+<function=search>
+<parameter=query>
+who created Python
+</parameter>
+</function>
+</tool_call>

@@ -1,0 +1,10 @@
+
+
+[[ ## next_thought ## ]]
+Now that I know the capital of France is Paris, I need to get the weather for Paris. Once I have the weather, I'll uppercase it, reverse the string, and then count the words in the reversed version.
+
+[[ ## next_tool_name ## ]]
+get_weather
+
+[[ ## next_tool_args ## ]]
+{"city": "Paris"}

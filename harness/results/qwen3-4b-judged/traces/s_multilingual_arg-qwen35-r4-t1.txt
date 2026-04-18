@@ -1,0 +1,9 @@
+
+
+<next_thought>
+The translation is complete and the punctuation has been preserved as requested. The task is now finished.
+</next_thought>
+<tool_call>
+<function=finish>
+</function>
+</tool_call>

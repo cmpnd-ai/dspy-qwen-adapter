@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+The weather in Tokyo is sunny with a temperature of 72F. The question has been answered.
+
+[[ ## next_tool_name ## ]]
+finish
+
+[[ ## next_tool_args ## ]]
+{}
+
+[[ ## completed ## ]]

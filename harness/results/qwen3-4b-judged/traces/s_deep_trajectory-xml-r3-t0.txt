@@ -1,0 +1,13 @@
+
+
+<next_thought>
+First, find the capital of France using the capital_of tool. Then get the weather for that capital. Next, uppercase the weather string, reverse it, and count the words in the reversed string.
+</next_thought>
+
+<next_tool_name>
+capital_of
+</next_tool_name>
+
+<next_tool_args>
+{"country": "France"}
+</next_tool_args>

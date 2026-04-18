@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s1_single_tool,qwen35,0,2,False,0,0,True,True,"The answer states the weather in Tokyo is sunny with a temperature of 72F, matching the criterion's requirement to convey the tool's reported weather.",
+s1_single_tool,qwen35,1,2,False,0,0,True,True,"The answer states the weather in Tokyo is sunny with a temperature of 72F, matching the criterion's requirement to convey the tool's reported weather.",
+s1_single_tool,qwen35,2,2,False,0,0,True,True,"The answer states the weather in Tokyo is sunny with a temperature of 72F, matching the criterion's requirement to convey the tool's reported weather.",
+s1_single_tool,qwen35,3,2,False,0,0,True,True,"The answer states the weather in Tokyo is sunny with a temperature of 72F, matching the criterion's requirement to convey the tool's reported weather.",
+s1_single_tool,qwen35,4,2,False,0,0,True,True,"The answer states the weather in Tokyo is sunny with a temperature of 72F, matching the criterion's requirement to convey the tool's reported weather.",

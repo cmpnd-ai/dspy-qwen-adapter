@@ -1,0 +1,10 @@
+
+
+[[ ## next_thought ## ]]
+I need to find the capital of France first. The capital of France is Paris. Then I will get the weather for Paris, uppercase the weather string, reverse it, and count the words.
+
+[[ ## next_tool_name ## ]]
+capital_of
+
+[[ ## next_tool_args ## ]]
+{"country": "France"}

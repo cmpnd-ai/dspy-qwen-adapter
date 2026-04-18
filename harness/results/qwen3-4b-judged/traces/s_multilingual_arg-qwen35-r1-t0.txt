@@ -1,0 +1,15 @@
+
+
+<next_thought>
+I need to translate the given text into Spanish while preserving punctuation. The translate tool is required for this task.
+</next_thought>
+<tool_call>
+<function=translate>
+<parameter=text>
+"It's a beautiful day — she said, “hello!” The café is open."
+</parameter>
+<parameter=to>
+Spanish
+</parameter>
+</function>
+</tool_call>

@@ -1,0 +1,9 @@
+
+
+<reasoning>
+The translation tool preserved all punctuation marks from the original text. The sentence structure and special characters (em dash, quotes) were maintained as requested.
+</reasoning>
+
+<answer>
+It's a beautiful day — she said, “hello!” The café is open.
+</answer>

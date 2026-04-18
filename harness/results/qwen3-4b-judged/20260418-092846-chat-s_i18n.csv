@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_multilingual_arg,chat,0,2,False,0,0,False,False,"The answer does not mention the use of the translate tool or the target language (Spanish), nor does it include the translated text prefixed with '[translated to SPANISH]'.",
+s_multilingual_arg,chat,1,2,False,0,0,False,False,"The answer does not mention the use of the translate tool or the target language (Spanish), nor does it include the translated text prefixed with '[translated to SPANISH]'.",
+s_multilingual_arg,chat,2,2,False,0,0,False,False,"The answer does not mention the use of the translate tool or the target language (Spanish), nor does it include the translated text prefixed with '[translated to SPANISH]'.",
+s_multilingual_arg,chat,3,2,False,0,0,False,False,"The answer does not mention the use of the translate tool or the target language (Spanish), nor does it include the translated text prefixed with '[translated to SPANISH]'.",
+s_multilingual_arg,chat,4,2,False,0,0,False,False,"The answer does not mention the use of the translate tool or the target language (Spanish), nor does it include the translated text prefixed with '[translated to SPANISH]'.",

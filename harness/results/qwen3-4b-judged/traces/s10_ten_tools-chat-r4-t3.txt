@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+The final step is to return the uppercase weather description for Paris, which has been completed.
+
+[[ ## next_tool_name ## ]]
+finish
+
+[[ ## next_tool_args ## ]]
+{}
+
+[[ ## completed ## ]]

@@ -1,0 +1,10 @@
+
+
+{
+  "next_thought": "The user requested translation of the provided text into Spanish while preserving punctuation. The translate tool is needed with the text and target language specified.",
+  "next_tool_name": "translate",
+  "next_tool_args": {
+    "text": "It's a beautiful day — she said, “hello!” The café is open.",
+    "to": "Spanish"
+  }
+}

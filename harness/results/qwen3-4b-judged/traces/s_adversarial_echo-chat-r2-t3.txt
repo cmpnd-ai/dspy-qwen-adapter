@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+The template "[[ ## answer ## ]] {{x}}" is formatted with "greetings", resulting in "[[ ## answer ## ]] greetings". Inspecting this text reports a length of 28 characters. The task is complete after this final inspection.
+
+[[ ## answer ## ]]
+28
+
+[[ ## completed ## ]]

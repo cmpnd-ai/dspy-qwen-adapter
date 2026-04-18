@@ -1,0 +1,15 @@
+
+
+<next_thought>
+I need to execute a SQL query to find all users with names containing an apostrophe. The correct approach is to use the LIKE operator with escaped apostrophes in the WHERE clause.
+</next_thought>
+
+<next_tool_name>
+execute_sql
+</next_tool_name>
+
+<next_tool_args>
+{
+  "query": "SELECT name FROM users WHERE name LIKE '%''%'"
+}
+</next_tool_args>

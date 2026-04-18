@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_deep_trajectory,chat,0,6,False,0,0,True,True,The answer correctly reports a word count of 2 after reversing the uppercase weather string.,
+s_deep_trajectory,chat,1,6,False,0,0,True,True,The answer correctly reports a word count of 2 after reversing the uppercase weather string.,
+s_deep_trajectory,chat,2,6,False,0,0,True,True,The answer correctly reports a word count of 2 after reversing the uppercase weather string.,
+s_deep_trajectory,chat,3,6,False,0,0,True,True,The answer correctly reports a word count of 2 after reversing the uppercase weather string.,
+s_deep_trajectory,chat,4,6,False,0,0,True,True,The answer correctly reports a word count of 2 after reversing the uppercase weather string.,

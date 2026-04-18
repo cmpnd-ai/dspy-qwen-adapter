@@ -1,0 +1,10 @@
+
+
+I need to find the capital of France first.
+<tool_call>
+<function=capital_of>
+<parameter=country>
+France
+</parameter>
+</function>
+</tool_call>

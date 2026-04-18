@@ -1,0 +1,12 @@
+
+
+[[ ## next_thought ## ]]
+The translation has been completed, and the translated text is as provided. The task requires reporting the verbatim translation, so I can now conclude the process.
+
+[[ ## next_tool_name ## ]]
+finish
+
+[[ ## next_tool_args ## ]]
+{}
+
+[[ ## completed ## ]]

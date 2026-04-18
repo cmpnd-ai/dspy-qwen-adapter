@@ -1,0 +1,9 @@
+
+
+[[ ## reasoning ## ]]
+The capital of France is Paris. The weather in Paris is "cloudy, 60F". Converting this description to uppercase results in "CLOUDY, 60F".
+
+[[ ## answer ## ]]
+CLOUDY, 60F
+
+[[ ## completed ## ]]
