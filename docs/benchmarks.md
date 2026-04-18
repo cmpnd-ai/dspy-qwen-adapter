@@ -86,10 +86,13 @@ and `ChatAdapter`.
 | s_i18n — multilingual arg | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
 
 **Takeaways on 4B:**
-- **Substring and judge agree on every cell**, including the qwen35
-  `s_i18n` 0% — the judge confirms this isn't a metric artifact but a
-  real regression: our trajectory replay causes the weaker 4B model to
-  paraphrase away the context that a translation was attempted.
+- **Substring and judge agree on every cell.** The qwen35 `s_i18n` 0%
+  is confirmed by both metrics — the 4B model paraphrases the mock
+  tool's `[translated to SPANISH]` prefix away when reporting. This is
+  a scenario-specific weakness tied to the benchmark's narrative-prefix
+  mock tool, not a production tool-calling regression (a real translate
+  tool returns actual translated text, which small models copy fine).
+  See finding #5 below.
 - **qwen35 wins or ties elsewhere.** `s_echo`: 100/100 vs json's
   80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen35 is 0.00.
 - **The thinking-mode empty-text trap still bites json.** JSONAdapter

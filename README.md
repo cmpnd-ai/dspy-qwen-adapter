@@ -60,11 +60,14 @@ All runs completed 0 parse failures.
 | s1 (single tool) | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
 | s_echo | 100 / 100 / 0.00 | 80 / 80 / 0.00 | **100 / 100 / 0.00** |
 | s_deep | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| **s_i18n** | 100 / 100 / 0.00 | **0 / 0 / 0.00** | **100 / 100 / 0.00** |
+| s_i18n | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
 
-*(4B `s_i18n` number reflects the fix in commit `635f60e` — extract-turn
-guidance that asks the model to quote tool outputs verbatim; before the
-fix, qwen35 was 0/0 on this cell.)*
+*(4B `s_i18n` is a scenario-specific weakness: the mock translate tool
+returns English with a `[translated to SPANISH]` narrative prefix, and
+small models paraphrase the prefix away when reporting. Not a real-world
+tool-calling regression — production translate tools return actual
+translated text. See [docs/benchmarks.md](docs/benchmarks.md) for the
+trace analysis.)*
 
 ### Headline findings
 

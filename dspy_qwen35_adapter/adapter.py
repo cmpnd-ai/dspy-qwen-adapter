@@ -276,23 +276,6 @@ class Qwen35Adapter(Adapter):
             tools=tool_list,
             react_fields=react_fields,
         )
-        # Extract-turn guidance: when the signature has a pre-rendered
-        # `trajectory` input but is NOT a ReAct turn (so it's the
-        # ChainOfThought extract that produces the final answer), small
-        # models tend to paraphrase tool outputs away. Asking explicitly
-        # for verbatim reporting keeps them from cleaning up prefixes or
-        # structural markers that may carry task-relevant information.
-        is_extract_turn = (
-            not react_fields
-            and "trajectory" in signature.input_fields
-        )
-        if is_extract_turn:
-            system = (
-                (system + "\n\n" if system else "")
-                + "When your answer references information obtained from a "
-                "tool call in the trajectory, quote the tool's output "
-                "verbatim rather than paraphrasing or summarizing it."
-            )
         user = self.format_user_message_content(signature, inputs)
         return [
             {"role": "system", "content": system},
