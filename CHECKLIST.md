@@ -1,3 +1,0 @@
-- [ ] rename to dspy-qwen-adapter
-- [ ] update readme
-- [ ] try all modules (including RLM)

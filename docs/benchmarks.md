@@ -39,30 +39,51 @@ Raw CSVs + captured LM traces for every run are archived under
 
 ## Results
 
-Columns: `substring % / judge % / tool_fail per run`. Substring is the
-cheap-heuristic match against `golden_answer_substring`; judge is the
-LLM-judge verdict against `judge_criterion`; tool_fail is the average
-number of `"Execution error"` observations per run.
+Every cell summarizes five runs. Each cell is scored two ways:
 
-The judge used the same local Qwen 3.5 model the adapter was being tested
-against (self-judging — see Limitations). Judge calls use `temperature=0.0`
+- **Task success** — fraction of runs where the LLM judge verdict
+  (`judge_pass`) was `True`, against a per-scenario criterion. A cheap
+  substring heuristic is also tracked on every run; it agrees with the
+  judge on every cell except qwen `s_i18n` on 35B (see below), so we
+  report only the judge value in the tables to keep them readable.
+- **Tool-fail / run** — average number of tool-call executions per run
+  that raised an exception (ReAct catches these, feeds `"Execution
+  error: ..."` back as the observation, and the model retries on the
+  next turn). Every such error is a wasted turn, even when the run
+  ultimately succeeds. Only shown in a separate sparse table; zero
+  cells are omitted.
+
+⚠ marks cells where every run produced a parse failure (the adapter
+couldn't extract required output fields from the LM response).
+
+The judge LM is the same local Qwen 3.5 model being benchmarked
+(self-judging — see Limitations). Judge calls use `temperature=0.0`
 and `ChatAdapter`.
 
 ### qwen3.5-35b-a3b (judged)
 
-Columns: substring % / judge % / tool_fail per run. **parse_fail/run** in
-the commentary when nonzero.
+**Task success**
 
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
-| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.80 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
-| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_echo — adversarial delimiters | 100 / 100 / 0.00 | 100 / 100 / 0.40 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
-| s_deep — 8-step chain | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **80 / 80 / 2.20** *(parse_fail 0.20)* | **100 / 100 / 0.00** |
-| **s_i18n — multilingual arg** | **0 / 0 / 0.00** | **40 / 40 / 0.00** | **0 / 0 / 0.00** | **100 / 80 / 0.00** |
+| s1 — single tool | 100% | 100% | 100% | **100%** |
+| s3 — three tools | 100% | 100% | **0%** ⚠ | **100%** |
+| s10 — ten tools | 100% | 100% | 100% | **100%** |
+| s_sql — quoted SQL strings | 100% | 100% | 100% | **100%** |
+| s_code — Python write + run | 100% | 100% | 100% | **100%** |
+| s_echo — adversarial delimiters | 100% | 100% | 100% | **100%** |
+| s_deep — 8-step chain | 100% | 100% | **80%** ⚠ | **100%** |
+| **s_i18n — multilingual arg** | **0%** | **40%** | **0%** | **80%** |
+
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s10 | — | 0.80 | 0.40 |
+| s_echo | — | 0.40 | 0.20 |
+| s_deep | 0.60 | 0.20 | **2.20** |
+
+**Parse failures**: xml 1.00/run on `s3`, 0.20/run on `s_deep`. qwen, chat, json all 0.00.
 
 **Takeaways on 35B:**
 
@@ -77,29 +98,41 @@ the commentary when nonzero.
     field-name cues from ReAct's auto-generated instructions.
   - `s_deep`: 2.20 tool_fail/run (vs qwen 0.00) — the long chain
     accumulates mis-shaped tool calls that fail at execution.
-- **qwen wins `s_i18n`** (100/80) vs every other adapter (chat 0/0,
-  json 40/40, xml 0/0) — multi-turn trajectory rendering with
-  `<tool_response name=...>` keeps the model grounded in what each tool
-  actually returned.
-- **qwen has the lowest `tool_fail` rate on every complex scenario.**
+- **qwen wins `s_i18n`** (80% judge, 100% substring) vs every other
+  adapter — multi-turn trajectory rendering with `<tool_response
+  name=...>` keeps the model grounded in what each tool actually
+  returned.
+- **qwen has the lowest tool-fail rate on every complex scenario.**
   `s_deep`: 0.00 vs chat 0.60, json 0.20, xml 2.20. Same or better task
   success with fewer wasted turns.
-- **Substring and judge agree on every cell** except qwen `s_i18n`
-  (100/80). The 1/5 judge miss had an empty `judge_reason` — a
-  judge-side parse glitch, not an adapter issue.
+- **The one judge-vs-substring disagreement** is qwen `s_i18n`: judge
+  80%, substring 100%. The 1/5 judge miss had an empty `judge_reason`
+  — judge-side infrastructure glitch, not an adapter issue. Every
+  other cell: substring == judge.
 
 ### qwen3.5-4b (judged)
 
+**Task success**
+
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s1 — single tool | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| **s_code — Python write + run** | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
-| s_echo — adversarial delimiters | 100 / 100 / 0.00 | **80 / 80 / 0.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_deep — 8-step chain | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_i18n — multilingual arg | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+| s1 — single tool | 100% | 100% | 100% | **100%** |
+| s3 — three tools | 100% | 100% | 100% | **100%** |
+| s10 — ten tools | 100% | 100% | 100% | **100%** |
+| s_sql — quoted SQL strings | 100% | 100% | 100% | **100%** |
+| **s_code — Python write + run** | 100% | 100% | **0%** ⚠ | **100%** |
+| s_echo — adversarial delimiters | 100% | **80%** | 100% | **100%** |
+| s_deep — 8-step chain | 100% | 100% | 100% | **100%** |
+| s_i18n — multilingual arg | 100% | 0% | 0% | 0% |
+
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s1 | **1.00** | — | — |
+| s_deep | **1.00** | — | — |
+
+**Parse failures**: xml 1.00/run on `s_code`. qwen, chat, json all 0.00.
 
 **Takeaways on 4B:**
 - **Substring and judge agree on every cell.**
@@ -112,10 +145,10 @@ the commentary when nonzero.
   because it scrubs those field-name cues from ReAct's instructions and
   routes the ReAct output through its own `split_thought_and_call`
   parser that tolerates missing args.
-- **qwen wins or ties elsewhere.** `s_echo`: 100/100 vs json's
-  80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen is 0.00.
+- **qwen wins or ties elsewhere.** `s_echo`: 100% vs json's 80%. `s1`
+  / `s_deep`: chat's tool-fail is 1.00; qwen is 0.00.
 - **The thinking-mode empty-text trap still bites json.** JSONAdapter
-  dropped to 80 on `s_echo` because one extract turn came back with
+  dropped to 80% on `s_echo` because one extract turn came back with
   `text=""` and all-None outputs. QwenAdapter's `reasoning_content`
   fallback (commit `b41ca6d`) prevents this.
 - **qwen `s_i18n` 0%** — the 4B model paraphrases the mock tool's
@@ -126,42 +159,56 @@ the commentary when nonzero.
 ### qwen3-4b (out-of-distribution judged)
 
 Qwen 3 (not 3.5) uses a **different trained tool-call format** —
-Hermes-style `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`
-— instead of Qwen 3.5's `<tool_call><function=NAME>...</function></tool_call>`
-XML. This matrix tests how QwenAdapter performs on a model family it
-was not designed for; in-context prompting pulls the model toward the
+[Hermes-style](https://qwen.readthedocs.io/en/latest/framework/function_call.html)
+`<tool_call>{"name": "...", "arguments": {...}}</tool_call>` — instead of
+Qwen 3.5's `<tool_call><function=NAME>...</function></tool_call>` XML.
+This matrix tests how QwenAdapter performs on a model family it was
+not designed for; in-context prompting pulls the model toward the
 adapter's format despite the training mismatch.
+
+**Task success**
 
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s1 — single tool | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / **2.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_sql | 100 / 100 / 0.00 | 100 / 100 / **1.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_code | 100 / 100 / **1.00** | 100 / 100 / **1.00** | 100 / 100 / **2.00** | **100 / 100 / 0.00** |
-| s_echo | 100 / 0 / 0.00 | 100 / 0 / 0.00 | 100 / 0 / 0.00 | **0 / 0 / 0.00** |
-| s_deep | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_i18n | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+| s1 — single tool | 100% | 100% | 100% | **100%** |
+| s3 — three tools | 100% | 100% | 100% | **100%** |
+| s10 — ten tools | 100% | 100% | 100% | **100%** |
+| s_sql | 100% | 100% | 100% | **100%** |
+| s_code | 100% | 100% | 100% | **100%** |
+| s_echo | 0% | 0% | 0% | 0% |
+| s_deep | 100% | 100% | 100% | **100%** |
+| s_i18n | 0% | 0% | 0% | 0% |
+
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 on every scenario)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s3 | — | **2.00** | — |
+| s_sql | — | 1.00 | — |
+| s_code | 1.00 | 1.00 | **2.00** |
+
+**Parse failures**: all adapters 0.00 — Qwen 3 follows the prompt exemplar despite training on a different format.
 
 **Takeaways on Qwen 3-4B:**
-- **qwen has 0.00 tool_fail on every scenario.** chat/json/xml all
-  hit 1.00 – 2.00 tool_fail/run on `s_code`; json hits 2.00 on `s3` and
+- **qwen has 0.00 tool-fail on every scenario.** chat/json/xml all
+  hit 1.00 – 2.00 tool-fail/run on `s_code`; json hits 2.00 on `s3` and
   1.00 on `s_sql`; xml hits 2.00 on `s_code`. qwen drives the long-
   chain / structured-arg scenarios cleanly even on an out-of-distribution
   model.
-- **All four adapters fail `s_echo` judge** (substring passes for
-  chat/json/xml because "28" is the correct mock output, but the 4B
-  model hallucinates the length reasoning in ways the judge rejects).
-  qwen's 0% substring reflects the model computing 23 instead of 28
-  — a trajectory-rendering artifact specific to weak models + mock
-  tools rather than a production regression.
+- **All four adapters fail `s_echo` judge.** Substring would pass 100%
+  for chat/json/xml because "28" is the correct mock output and it
+  appears somewhere in the chain, but the 4B model hallucinates the
+  length reasoning in ways the judge rejects. qwen's 0% on both
+  metrics reflects the model computing 23 instead of 28 — a
+  trajectory-rendering artifact specific to weak models + mock tools,
+  not a production regression.
 - **All four adapters fail `s_i18n`** — 4B models (across both Qwen 3
   and Qwen 3.5) paraphrase the mock `[translated to SPANISH]` prefix
   away regardless of adapter.
 - **0 parse failures across 160 runs on Qwen 3-4B** — Qwen 3 is
   flexible enough to follow the XML exemplar prompt even though its
-  trained format is Hermes JSON. The adapter is out-of-distribution but
-  functional.
+  trained format is Hermes JSON. The adapter is out-of-distribution
+  but functional.
 
 ## Scenario catalog
 

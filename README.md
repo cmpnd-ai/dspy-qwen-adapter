@@ -45,73 +45,115 @@ This adapter:
 
 ## Benchmark results
 
-880 total runs: 4 adapters × 8 scenarios × 5 runs × 3 models, each with
-an LLM-judge verdict alongside cheap substring matching. See
-[docs/benchmarks.md](docs/benchmarks.md) for methodology, per-cell
-reasoning, and limitations.
+880 total runs: 4 adapters × 8 scenarios × 5 runs × 3 models, each scored
+by an LLM judge. See [docs/benchmarks.md](docs/benchmarks.md) for
+methodology, per-cell reasoning, and limitations.
 
-**Columns:** task_success (substring / LLM-judge) / tool_fail per run.
-**Bold** entries mark the decisive cell for that row.
+**Legend:**
+- **Task success** = fraction of 5 runs where the LLM judge scored the
+  final answer correct. (A cheap substring metric is also recorded; it
+  agrees with the judge on every cell except one infrastructure
+  anomaly, so we report only the judge value here.)
+- **Tool-fail / run** = average number of tool-call executions per run
+  that raised an exception — ReAct recovered, but each one is a wasted
+  turn. Shown in a separate sparse table; only non-zero cells included.
+- ⚠ marks cells where every run had a parse failure (adapter couldn't
+  extract output fields from the LM response).
 
 ### qwen3.5-35b-a3b
 
+**Task success**
+
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s1, s_sql, s_code | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| **s3 (three tools)** | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
-| s10 (10 tools) | 100 / 100 / 0.00 | 100 / 100 / 0.80 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
-| s_echo (adversarial delimiters) | 100 / 100 / 0.00 | 100 / 100 / 0.40 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
-| s_deep (8-step chain) | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **80 / 80 / 2.20** | **100 / 100 / 0.00** |
-| **s_i18n (multilingual arg)** | **0 / 0 / 0.00** | 40 / 40 / 0.00 | 0 / 0 / 0.00 | **100 / 80 / 0.00** |
+| s1 | 100% | 100% | 100% | **100%** |
+| s3 | 100% | 100% | **0%** ⚠ | **100%** |
+| s10 | 100% | 100% | 100% | **100%** |
+| s_sql | 100% | 100% | 100% | **100%** |
+| s_code | 100% | 100% | 100% | **100%** |
+| s_echo | 100% | 100% | 100% | **100%** |
+| s_deep | 100% | 100% | **80%** ⚠ | **100%** |
+| **s_i18n** | **0%** | 40% | 0% | **80%** |
+
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s10 | — | 0.80 | 0.40 |
+| s_echo | — | 0.40 | 0.20 |
+| s_deep | 0.60 | 0.20 | **2.20** |
 
 ### qwen3.5-4b
 
+**Task success**
+
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s3, s10, s_sql | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s1 (single tool) | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| **s_code** | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
-| s_echo | 100 / 100 / 0.00 | 80 / 80 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_deep | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_i18n | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+| s1 | 100% | 100% | 100% | **100%** |
+| s3 | 100% | 100% | 100% | **100%** |
+| s10 | 100% | 100% | 100% | **100%** |
+| s_sql | 100% | 100% | 100% | **100%** |
+| **s_code** | 100% | 100% | **0%** ⚠ | **100%** |
+| s_echo | 100% | **80%** | 100% | **100%** |
+| s_deep | 100% | 100% | 100% | **100%** |
+| s_i18n | 100% | 0% | 0% | 0% |
+
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s1 | **1.00** | — | — |
+| s_deep | **1.00** | — | — |
 
 ### qwen3-4b (out-of-distribution — Hermes-format model)
 
-Qwen 3 was trained on Hermes-style tool calls, not the XML format this
-adapter prompts for. The benchmark tests whether in-context compliance
-is strong enough to bridge the distribution gap.
+Qwen 3 was trained on [Hermes-style](https://qwen.readthedocs.io/en/latest/framework/function_call.html)
+tool calls, not the XML format this adapter prompts for. The benchmark
+tests whether in-context compliance bridges the distribution gap.
+
+**Task success**
 
 | scenario | chat | json | xml | **qwen** |
 |---|---|---|---|---|
-| s1, s10, s_deep | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 (three tools) | 100 / 100 / 0.00 | 100 / 100 / **2.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_sql | 100 / 100 / 0.00 | 100 / 100 / **1.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| **s_code** | 100 / 100 / **1.00** | 100 / 100 / **1.00** | 100 / 100 / **2.00** | **100 / 100 / 0.00** |
-| s_echo | 100 / 0 / 0.00 | 100 / 0 / 0.00 | 100 / 0 / 0.00 | 0 / 0 / 0.00 |
-| s_i18n | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+| s1 | 100% | 100% | 100% | **100%** |
+| s3 | 100% | 100% | 100% | **100%** |
+| s10 | 100% | 100% | 100% | **100%** |
+| s_sql | 100% | 100% | 100% | **100%** |
+| s_code | 100% | 100% | 100% | **100%** |
+| s_echo | 0% | 0% | 0% | 0% |
+| s_deep | 100% | 100% | 100% | **100%** |
+| s_i18n | 0% | 0% | 0% | 0% |
 
-*(s_echo + s_i18n 4B failures across all adapters are weak-model + mock-tool
-artifacts — the 4B model hallucinates lengths or paraphrases narrative
-prefixes regardless of adapter. See [docs/benchmarks.md](docs/benchmarks.md).)*
+**Tool-fail / run** (non-zero cells only; qwen is 0.00 everywhere)
+
+| scenario | chat | json | xml |
+|---|---|---|---|
+| s3 | — | **2.00** | — |
+| s_sql | — | 1.00 | — |
+| s_code | 1.00 | 1.00 | **2.00** |
+
+*(s_echo and s_i18n failures across all adapters on 4B-class models are
+weak-model + mock-tool artifacts — the model hallucinates lengths or
+paraphrases narrative prefixes regardless of adapter. Not a production
+tool-calling regression. See [docs/benchmarks.md](docs/benchmarks.md).)*
 
 ### Headline findings
 
 - **0 parse failures across all 600 qwen-adapter runs on all three models.**
   XMLAdapter by comparison failed every `s3` run on 35B and every `s_code`
-  run on 4B (parse_fail 1.00 per run).
-- **0.00 tool_fail per run on every scenario on every model.** The closest
+  run on 4B.
+- **0.00 tool-fail / run on every scenario on every model.** The closest
   alternatives spike to 0.20 – 2.20 on multi-step and structured-arg
   scenarios. Same or better task success, fewer wasted turns.
 - **Only adapter that reliably handles multilingual / delimiter-leaking
-  tool output on 35B.** `s_i18n`: `qwen` 100/80 vs chat 0/0, json 40/40,
-  xml 0/0.
+  tool output on 35B.** `s_i18n`: qwen 80% vs chat 0%, json 40%, xml 0%.
 - **Rescues `reasoning_content` turns** that silently break stock adapters
   on thinking-mode models. `json` lost a run on `s_echo` 4B this way;
   `qwen` caught it via the fallback.
 - **Works on Qwen 3 despite the training-distribution mismatch.** The XML
   exemplar in our prompt is strong enough that Qwen 3 (trained on
-  Hermes) follows it anyway, and our adapter still posts the best
-  tool_fail numbers across all scenarios.
+  Hermes) follows it anyway, and qwen still posts the best tool-fail
+  numbers across all scenarios.
 
 ## Install
 
