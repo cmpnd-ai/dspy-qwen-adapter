@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_sql_quoted_strings,xml,0,2,False,0,0,True,True,The answer successfully lists the specific user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,
+s_sql_quoted_strings,xml,1,2,False,0,0,True,True,The answer successfully lists the specific user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,
+s_sql_quoted_strings,xml,2,2,False,0,0,True,True,The answer successfully lists the specific user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,
+s_sql_quoted_strings,xml,3,2,False,0,0,True,True,The answer successfully lists the specific user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,
+s_sql_quoted_strings,xml,4,2,False,0,0,True,True,The answer successfully lists the specific user names containing apostrophes (O'Brien and d'Angelo) as required by the criterion.,

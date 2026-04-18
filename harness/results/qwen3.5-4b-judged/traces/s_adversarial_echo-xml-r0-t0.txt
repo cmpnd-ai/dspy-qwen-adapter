@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I need to follow the instructions step by step. First, I'll call format_template with the specified template and value to get a result, then pass that result to inspect_text to find its length. Let me start by calling format_template.
+</next_thought>
+
+<next_tool_name>
+format_template
+</next_tool_name>
+
+<next_tool_args>
+{"template": "[[ ## answer ## ]] {{x}}", "value": "greetings"}
+</next_tool_args>

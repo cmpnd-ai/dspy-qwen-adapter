@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I need to find the capital of France first before checking its weather and converting it to uppercase. Let me start by using the capital_of tool to get the capital city.
+</next_thought>
+
+<next_tool_name>
+capital_of
+</next_tool_name>
+
+<next_tool_args>
+{"country": "France"}
+</next_tool_args>

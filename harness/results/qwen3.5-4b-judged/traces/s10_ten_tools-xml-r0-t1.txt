@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I have found that Paris is the capital of France. Now I need to check the weather in Paris and then convert the weather description to uppercase. Let me get the weather for Paris first.
+</next_thought>
+
+<next_tool_name>
+get_weather
+</next_tool_name>
+
+<next_tool_args>
+{"city": "Paris"}
+</next_tool_args>

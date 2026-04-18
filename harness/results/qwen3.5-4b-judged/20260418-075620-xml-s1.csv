@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s1_single_tool,xml,0,2,False,0,0,True,True,The answer correctly conveys the tool's reported weather as sunny and 72F without any refusal or hedging.,
+s1_single_tool,xml,1,2,False,0,0,True,True,The answer correctly conveys the tool's reported weather as sunny and 72F without any refusal or hedging.,
+s1_single_tool,xml,2,2,False,0,0,True,True,The answer correctly conveys the tool's reported weather as sunny and 72F without any refusal or hedging.,
+s1_single_tool,xml,3,2,False,0,0,True,True,The answer correctly conveys the tool's reported weather as sunny and 72F without any refusal or hedging.,
+s1_single_tool,xml,4,2,False,0,0,True,True,The answer correctly conveys the tool's reported weather as sunny and 72F without any refusal or hedging.,

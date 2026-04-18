@@ -90,31 +90,38 @@ the commentary when nonzero.
 
 ### qwen3.5-4b (judged)
 
-| scenario | chat | json | **qwen35** |
-|---|---|---|---|
-| s1 — single tool | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_code — Python write + run | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_echo — adversarial delimiters | 100 / 100 / 0.00 | **80 / 80 / 0.00** | **100 / 100 / 0.00** |
-| s_deep — 8-step chain | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
-| s_i18n — multilingual arg | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
+| scenario | chat | json | xml | **qwen35** |
+|---|---|---|---|---|
+| s1 — single tool | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s3 — three tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s10 — ten tools | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_sql — quoted SQL strings | 100 / 100 / 0.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| **s_code — Python write + run** | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **0 / 0 / 0.00** *(parse_fail 1.00)* | **100 / 100 / 0.00** |
+| s_echo — adversarial delimiters | 100 / 100 / 0.00 | **80 / 80 / 0.00** | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_deep — 8-step chain | 100 / 100 / 1.00 | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_i18n — multilingual arg | 100 / 100 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 | 0 / 0 / 0.00 |
 
 **Takeaways on 4B:**
-- **Substring and judge agree on every cell.** The qwen35 `s_i18n` 0%
-  is confirmed by both metrics — the 4B model paraphrases the mock
-  tool's `[translated to SPANISH]` prefix away when reporting. This is
-  a scenario-specific weakness tied to the benchmark's narrative-prefix
-  mock tool, not a production tool-calling regression (a real translate
-  tool returns actual translated text, which small models copy fine).
-  See finding #5 below.
+- **Substring and judge agree on every cell.**
+- **XMLAdapter's failure mode shifts between model sizes.** On 35B it
+  failed `s3` (malformed tool-call XML with field-name cues); on 4B it
+  fails `s_code` (5/5 parse_fail) because the model emits only
+  `<next_thought>` + `<next_tool_name>` and omits the required
+  `<next_tool_args>` field entirely, which XMLAdapter's strict
+  "all-or-nothing" parser rejects. Our adapter doesn't hit either case
+  because it scrubs those field-name cues from ReAct's instructions and
+  routes the ReAct output through its own `split_thought_and_call`
+  parser that tolerates missing args.
 - **qwen35 wins or ties elsewhere.** `s_echo`: 100/100 vs json's
   80/80. `s_deep` / `s1`: chat's tool_fail is 1.00; qwen35 is 0.00.
 - **The thinking-mode empty-text trap still bites json.** JSONAdapter
   dropped to 80 on `s_echo` because one extract turn came back with
   `text=""` and all-None outputs. Qwen35Adapter's `reasoning_content`
   fallback (commit `b41ca6d`) prevents this.
+- **qwen35 `s_i18n` 0%** — the 4B model paraphrases the mock tool's
+  `[translated to SPANISH]` prefix away when reporting. Not a
+  production tool-calling regression; real translate tools return
+  actual translated text. See finding #5 below.
 
 ## Scenario catalog
 

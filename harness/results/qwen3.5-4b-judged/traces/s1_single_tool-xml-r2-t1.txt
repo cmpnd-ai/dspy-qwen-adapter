@@ -1,0 +1,13 @@
+
+
+<next_thought>
+The weather for Tokyo has been retrieved successfully - it's sunny at 72°F. I have all the information needed to answer the question, so I can now mark this task as complete.
+</next_thought>
+
+<next_tool_name>
+finish
+</next_tool_name>
+
+<next_tool_args>
+{}
+</next_tool_args>

@@ -1,0 +1,13 @@
+
+
+<next_thought>
+I need to find out what the weather is like in Tokyo. The get_weather tool can help me retrieve this information by specifying the city name as an argument.
+</next_thought>
+
+<next_tool_name>
+get_weather
+</next_tool_name>
+
+<next_tool_args>
+{"city": "Tokyo"}
+</next_tool_args>

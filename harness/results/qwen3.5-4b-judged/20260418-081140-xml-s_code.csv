@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s_code_write_and_run,xml,0,0,False,1,0,False,False,answer is empty,BadRequestError
+s_code_write_and_run,xml,1,0,False,1,0,False,False,answer is empty,BadRequestError
+s_code_write_and_run,xml,2,0,False,1,0,False,False,answer is empty,BadRequestError
+s_code_write_and_run,xml,3,0,False,1,0,False,False,answer is empty,BadRequestError
+s_code_write_and_run,xml,4,0,False,1,0,False,False,answer is empty,BadRequestError

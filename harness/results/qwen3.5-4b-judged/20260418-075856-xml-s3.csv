@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,task_succeeded,judge_pass,judge_reason,error
+s3_three_tools,xml,0,3,False,0,0,True,True,The answer correctly provides the calculated result of 2001 as required by the criterion.,
+s3_three_tools,xml,1,3,False,0,0,True,True,The answer correctly provides the calculated result of 2001 as required by the criterion.,
+s3_three_tools,xml,2,3,False,0,0,True,True,The answer correctly provides the calculated result of 2001 as required by the criterion.,
+s3_three_tools,xml,3,3,False,0,0,True,True,The answer correctly provides the calculated result of 2001 as required by the criterion.,
+s3_three_tools,xml,4,3,False,0,0,True,True,The answer correctly provides the calculated result of 2001 as required by the criterion.,
