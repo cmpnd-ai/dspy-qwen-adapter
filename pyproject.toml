@@ -5,10 +5,26 @@ build-backend = "hatchling.build"
 [project]
 name = "dspy-qwen-adapter"
 version = "0.1.0"
-description = "DSPy adapter for Qwen 3.5 and 3.6 recommended formatting"
+description = "A drop-in DSPy adapter for reliable tool calling across the Qwen 3+ family."
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
+authors = [
+    {name = "Drew Breunig", email = "dbreunig@gmail.com"},
+]
+keywords = ["dspy", "qwen", "llm", "tool-calling", "agents", "react", "adapter"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "dspy>=3.1",
     "json-repair>=0.25",
@@ -17,11 +33,25 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov"]
 
+[project.urls]
+Homepage = "https://github.com/cmpnd-ai/dspy-qwen-adapter"
+Repository = "https://github.com/cmpnd-ai/dspy-qwen-adapter"
+Issues = "https://github.com/cmpnd-ai/dspy-qwen-adapter/issues"
+
 [tool.hatch.build.targets.wheel]
 packages = ["dspy_qwen_adapter"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["tests/", "harness/", "docs/", "dspy/"]
+exclude = [
+    "tests/",
+    "harness/",
+    "docs/",
+    "dspy/",
+    ".venv/",
+    "dist/",
+    "build/",
+    "*.egg-info/",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
