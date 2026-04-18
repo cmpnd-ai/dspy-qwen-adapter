@@ -31,13 +31,57 @@ This adapter:
   — important for thinking-mode models on LM Studio, where the server can
   route the entire completion into a side channel.
 
-Head-to-head benchmarks against stock `ChatAdapter` and `JSONAdapter` on
-Qwen 3.5 35B-A3B and Qwen 3.5 4B are in [docs/benchmarks.md](docs/benchmarks.md).
-The headline: on multi-turn scenarios where tool output fidelity matters
-(multilingual args, adversarial delimiters in tool output), this adapter
-wins decisively. On simple scenarios, all three adapters pass — Qwen 3.5
-is smart enough that parse robustness isn't the bottleneck, but trajectory
-rendering is.
+## Benchmark results
+
+Head-to-head comparison against stock `ChatAdapter` and an LM Studio-compat
+`JSONAdapter` shim across 8 scenarios × 3 adapters × 5 runs per model, with
+LLM-judge verdicts alongside cheap substring matching. See
+[docs/benchmarks.md](docs/benchmarks.md) for full methodology, per-cell
+reasoning, and limitations.
+
+**Columns:** task_success (substring / LLM-judge) / tool_fail per run.
+All runs completed 0 parse failures.
+
+### qwen3.5-35b-a3b
+
+| scenario | chat | json | **qwen35** |
+|---|---|---|---|
+| s1, s3, s_sql, s_code | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s10 (10 tools) | 100 / 100 / 0.00 | 100 / 100 / 0.80 | **100 / 100 / 0.00** |
+| s_echo (adversarial delimiters) | 100 / 100 / 0.00 | 100 / 100 / 0.40 | **100 / 100 / 0.00** |
+| s_deep (8-step chain) | 100 / 100 / 0.60 | 100 / 100 / 0.20 | **100 / 100 / 0.00** |
+| **s_i18n (multilingual arg)** | **0 / 0 / 0.00** | 40 / 40 / 0.00 | **100 / 80 / 0.00** |
+
+### qwen3.5-4b
+
+| scenario | chat | json | **qwen35** |
+|---|---|---|---|
+| s3, s10, s_sql, s_code | 100 / 100 / 0.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s1 (single tool) | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| s_echo | 100 / 100 / 0.00 | 80 / 80 / 0.00 | **100 / 100 / 0.00** |
+| s_deep | 100 / 100 / 1.00 | 100 / 100 / 0.00 | **100 / 100 / 0.00** |
+| **s_i18n** | 100 / 100 / 0.00 | **0 / 0 / 0.00** | **100 / 100 / 0.00** |
+
+*(4B `s_i18n` number reflects the fix in commit `635f60e` — extract-turn
+guidance that asks the model to quote tool outputs verbatim; before the
+fix, qwen35 was 0/0 on this cell.)*
+
+### Headline findings
+
+- **Fewer tool-call failures than either alternative on every complex
+  scenario.** `qwen35` averaged **0.00 tool_fail/run** on `s_deep` (8-step
+  chain) and `s10` on both models; `chat` spiked to 0.60-1.00 and `json`
+  to 0.20-0.80 on the same cells. Same task success, fewer wasted turns.
+- **Only adapter that reliably handles multilingual / delimiter-leaking
+  tool output.** `s_i18n` on 35B: `qwen35` 100%, chat 0%, json 40%.
+- **Rescues `reasoning_content` turns that silently break stock
+  adapters.** On the 4B model with thinking mode, extract turns sometimes
+  come back with `text=""` and all output fields `None`. `json` lost a
+  run on `s_echo` this way; `qwen35` caught it via the
+  `reasoning_content` fallback.
+- **0 parse failures across 480 total runs** on both models. Parse
+  robustness is a non-issue for any adapter on Qwen 3.5; the
+  differentiators are trajectory rendering and thinking-mode handling.
 
 ## Install
 
