@@ -193,10 +193,16 @@ class QwenAdapter(XMLAdapter):
             user = self.format_user_message_content(
                 signature, inputs, main_request=True
             )
-            return [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ]
+            # NOTE: Demo trajectories within each demo are pre-formatted strings
+            # (encoded by whatever adapter was active at collection time, not
+            # necessarily Qwen XML). This is a DSPy core limitation tracked in
+            # react.py TOPIC 01 — the package authors are actively working on it.
+            # We still inject demos so instruction-only optimizers work correctly;
+            # trajectory-content fidelity improves once DSPy resolves that issue.
+            messages = [{"role": "system", "content": system}]
+            messages.extend(self.format_demos(signature, demos))
+            messages.append({"role": "user", "content": user})
+            return messages
 
         # Non-ReAct: delegate to the base Adapter.format composition.
         # XMLAdapter's XML-tag behavior (field descriptions, structure,

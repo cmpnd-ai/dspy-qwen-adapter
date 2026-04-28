@@ -322,3 +322,79 @@ def test_postprocess_noop_when_both_empty():
     outputs = [{"text": ""}]
     values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
     assert values[0]["answer"] is None
+
+
+def test_react_demos_included_in_format_output():
+    """When an optimizer injects few-shot demos into a ReAct Predict, format()
+    must include them as multiturn messages between the system message and the
+    current user turn. Previously the ReAct branch silently dropped `demos`."""
+    a = QwenAdapter()
+    sig = _sample_signature_with_tools()
+
+    def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return "sunny"
+
+    demo = {
+        "question": "What is the weather in Paris?",
+        "tools": [Tool(get_weather)],
+        "trajectory": "",
+        "next_thought": "I should look up Paris weather.",
+        "next_tool_name": "get_weather",
+        "next_tool_args": {"city": "Paris"},
+    }
+
+    messages = a.format(
+        signature=sig,
+        demos=[demo],
+        inputs={
+            "question": "What is the weather in Tokyo?",
+            "tools": [Tool(get_weather)],
+            "trajectory": "",
+        },
+    )
+
+    all_content = " ".join(m["content"] for m in messages)
+    # Demo thought and tool call must appear somewhere in the message list
+    assert "Paris" in all_content
+    assert "get_weather" in all_content
+    # There must be more than just [system, user] — demo turns were injected
+    assert len(messages) > 2
+
+
+def test_react_demo_assistant_turn_uses_qwen_xml():
+    """The assistant turn injected for a ReAct demo must use Qwen XML format
+    (<tool_call><function=...>) not XMLAdapter's <field> tags."""
+    a = QwenAdapter()
+    sig = _sample_signature_with_tools()
+
+    def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return "sunny"
+
+    demo = {
+        "question": "What is the weather in Paris?",
+        "tools": [Tool(get_weather)],
+        "trajectory": "",
+        "next_thought": "Checking Paris.",
+        "next_tool_name": "get_weather",
+        "next_tool_args": {"city": "Paris"},
+    }
+
+    messages = a.format(
+        signature=sig,
+        demos=[demo],
+        inputs={
+            "question": "What is the weather in Tokyo?",
+            "tools": [Tool(get_weather)],
+            "trajectory": "",
+        },
+    )
+
+    assistant_messages = [m for m in messages if m["role"] == "assistant"]
+    assert len(assistant_messages) >= 1
+    content = assistant_messages[0]["content"]
+    # Must be Qwen XML format, not XMLAdapter's <next_tool_name> field tags
+    assert "<tool_call>" in content
+    assert "<function=get_weather>" in content
+    assert "<next_tool_name>" not in content
