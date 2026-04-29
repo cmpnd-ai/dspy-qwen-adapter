@@ -102,10 +102,10 @@ def _build_lm(args: argparse.Namespace) -> dspy.LM:
     return dspy.LM(
         model=args.model,
         api_base=args.api_base,
-        api_key="lm-studio",
+        api_key=args.api_key,
         temperature=0.0,
         max_tokens=args.max_tokens,
-        cache=False,
+        cache=False
     )
 
 
@@ -125,6 +125,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--api-base",
         default=os.environ.get("LMSTUDIO_BASE", "http://127.0.0.1:1234/v1"),
+    )
+    p.add_argument(
+        "--api-key",
+        default=os.environ.get("LM_API_KEY", "lm-studio"),
     )
     p.add_argument("--max-tokens", type=int, default=8192)
     p.add_argument(

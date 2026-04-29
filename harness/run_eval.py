@@ -301,6 +301,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="OpenAI-compatible API base URL.",
     )
     p.add_argument(
+        "--api-key",
+        default=os.environ.get("LM_API_KEY", "lm-studio"),
+        help="API key for the LM endpoint (default: $LM_API_KEY or 'lm-studio' for local).",
+    )
+    p.add_argument(
         "--temperature",
         type=float,
         default=0.0,
@@ -335,6 +340,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "stronger/independent judge; flag the finding accordingly."
         ),
     )
+    p.add_argument(
+        "--reasoning-effort",
+        default=None,
+        choices=["none", "low", "medium", "high"],
+        help=(
+            "Limit model reasoning/thinking. Passed as reasoning_effort to the "
+            "LM (supported by LM Studio; dropped gracefully on other providers). "
+            "When 'none', also injects /no-think into the Qwen system prompt."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -343,18 +358,29 @@ def main(argv: list[str] | None = None) -> int:
 
     scenario = ALL_SCENARIOS[args.scenario]
 
-    # Configure the LM once. dspy.context(adapter=...) rebinds per-run.
-    lm = dspy.LM(
+    # When reasoning_effort is set, drop it gracefully on providers that don't
+    # support it (e.g. OpenRouter) rather than crashing.
+    if args.reasoning_effort:
+        import litellm
+        litellm.drop_params = True
+
+    lm_kwargs: dict = dict(
         model=args.model,
         api_base=args.api_base,
-        api_key="lm-studio",  # LiteLLM wants a non-empty value; LM Studio ignores.
+        api_key=args.api_key,
         temperature=args.temperature,
         max_tokens=args.max_tokens,
-        cache=False,  # each run must hit the model fresh.
+        cache=False,
     )
+    if args.reasoning_effort:
+        lm_kwargs["reasoning_effort"] = args.reasoning_effort
+
+    lm = dspy.LM(**lm_kwargs)
     dspy.configure(lm=lm)
 
     judge_lm: dspy.LM | None = None
+
+
     if args.use_judge:
         judge_model = args.judge_model or args.model
         # Judge at temperature=0 for stable verdicts across runs. Budget is
@@ -363,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
         judge_lm = dspy.LM(
             model=judge_model,
             api_base=args.api_base,
-            api_key="lm-studio",
+            api_key=args.api_key,
             temperature=0.0,
             max_tokens=4096,
             cache=False,
