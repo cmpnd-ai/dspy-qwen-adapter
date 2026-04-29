@@ -162,6 +162,7 @@ class QwenAdapter(XMLAdapter):
         # whether LiteLLM claims the provider supports native function
         # calling. This is the design contract of the adapter.
         self.use_native_function_calling = False
+        self.use_json_adapter_fallback = False
         if native_response_types is not None:
             self.native_response_types = native_response_types
         self.strict_parse = strict_parse
@@ -237,6 +238,24 @@ class QwenAdapter(XMLAdapter):
             signature = signature.delete("tools")
             inputs = {k: v for k, v in inputs.items() if k != "tools"}
 
+        # For ReAct signatures, suppress XMLAdapter's "Respond with
+        # `<next_thought>`, `<next_tool_name>`, `<next_tool_args>`" footer.
+        # That footer conflicts with _REACT_GUIDANCE in the system prompt and
+        # causes the model to drift to DSPy-standard XML tags instead of
+        # Qwen-native <tool_call> format.  The system prompt already has the
+        # full format instructions, so the footer is redundant and harmful.
+        if _is_react_signature(signature) and main_request:
+            main_request = False
+
+        # ReAct extract step: Qwen-native tool-call XML in the trajectory may
+        # keep the model in tool-calling mode. Append a transition instruction
+        # so it switches to XML field output instead of emitting tool calls.
+        if main_request and "trajectory" in inputs and not _is_react_signature(signature):
+            suffix = (
+                "\n\nThe tool calls above are now complete. "
+                "Respond with the output fields using XML tags — do not make any more tool calls."
+            ) + suffix
+
         return super().format_user_message_content(
             signature, inputs, prefix=prefix, suffix=suffix, main_request=main_request
         )
@@ -281,6 +300,12 @@ class QwenAdapter(XMLAdapter):
                     "next_tool_args": {},
                 }
             name, args = call
+            # finish takes no parameters; the model sometimes tacks on a
+            # <parameter=answer>...</parameter> after multiple prior tool calls
+            # established a parameter pattern in context. Drop them so ReAct's
+            # tool dispatch doesn't raise an argument error.
+            if name == "finish":
+                args = {}
             return {
                 "next_thought": thought,
                 "next_tool_name": name,
@@ -300,31 +325,45 @@ class QwenAdapter(XMLAdapter):
         lm,
         lm_kwargs,
     ):
-        """Rescue turns where LM Studio / vLLM reasoning-parsers routed
-        everything into `reasoning_content` and left `text` empty.
+        """Rescue turns where the reasoning-parser routed content into
+        `reasoning_content` and left `text` incomplete.
 
-        Qwen 3 and 3.5 models in "thinking mode" may emit so much <think>
-        content that the server's reasoning parser consumes the entire
-        completion — leaving `text=""`. DSPy's base `_call_postprocess`
-        then skips `parse()` entirely and returns all output fields as
-        `None`, which kills the ReAct / extract turn.
+        Two failure modes handled:
 
-        We merge reasoning_content into text as a fallback so our parser
-        still has something to work with — often the runaway reasoning
-        contains a usable tool-call or final answer at the end.
+        1. `text` is empty — the server's reasoning parser consumed the entire
+           completion. Promote `reasoning_content` wholesale so `parse()` has
+           something to work with.
+
+        2. `text` has a thought sentence but no `<function=` tag (ReAct only)
+           — the model emitted the tool call inside its thinking side-channel
+           while only surfacing the thought in `text`. Append `reasoning_content`
+           so `split_thought_and_call` can find the tool call.
         """
         normalized = []
         for output in outputs:
-            if (
-                isinstance(output, dict)
-                and not output.get("text")
-                and output.get("reasoning_content")
-            ):
-                output = {**output, "text": output["reasoning_content"]}
+            if not isinstance(output, dict):
+                normalized.append(output)
+                continue
+            text = output.get("text") or ""
+            reasoning = output.get("reasoning_content") or ""
+            if not text and reasoning:
+                output = {**output, "text": reasoning}
                 logger.debug(
                     "QwenAdapter: text was empty; promoted reasoning_content "
                     "(%d chars) into text for parsing.",
-                    len(output["text"]),
+                    len(reasoning),
+                )
+            elif (
+                reasoning
+                and _is_react_signature(processed_signature)
+                and "<function=" not in text
+                and "<function=" in reasoning
+            ):
+                output = {**output, "text": text + "\n" + reasoning}
+                logger.debug(
+                    "QwenAdapter: tool call found only in reasoning_content; "
+                    "appended (%d chars) to text for parsing.",
+                    len(reasoning),
                 )
             normalized.append(output)
         return super()._call_postprocess(
