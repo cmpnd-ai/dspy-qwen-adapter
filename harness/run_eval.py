@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import dspy
+from dspy.clients.call_result import response_text
 from dspy.utils.callback import BaseCallback
 
 from dspy_qwen_adapter import QwenAdapter
@@ -38,6 +39,7 @@ CSV_FIELDS = [
     "max_iters_hit",
     "parse_failures",
     "tool_exec_failures",
+    "termination_reason",
     "task_succeeded",  # cheap substring match
     "judge_pass",      # LLM-judge verdict (empty string when --use-judge is off)
     "judge_reason",    # one-sentence rationale from the judge
@@ -52,14 +54,14 @@ class _LMStudioJSONAdapter(dspy.JSONAdapter):
 
     Stock JSONAdapter injects `response_format={"type": "json_object"}` on
     every request. LM Studio's OpenAI endpoint rejects that with
-    `'response_format.type' must be 'json_schema' or 'text'`. Overriding the
-    early-return hook so we never inject `response_format`; the adapter still
-    formats prompts as JSON and parses JSON from text — a fair comparison
-    point against servers that don't support structured outputs.
+    `'response_format.type' must be 'json_schema' or 'text'`. This variant
+    never sets `response_format`; it still formats prompts as JSON and parses
+    JSON from text, which makes it a fair comparison point against servers
+    without structured outputs.
     """
 
-    def _json_adapter_call_common(self, lm, lm_kwargs, signature, demos, inputs, call_fn):
-        return call_fn(lm, lm_kwargs, signature, demos, inputs)
+    def _prepare_response_format(self, lm, lm_kwargs, signature):
+        return None
 
 
 def build_adapter(name: str):
@@ -116,21 +118,23 @@ class TraceCapture(BaseCallback):
     ) -> None:
         if outputs is None:
             return
-        # `dspy.LM` returns a list of strings (content) or list of dicts
-        # (with a "text" key) depending on response format. Normalize both.
+        # `dspy.LM` returns an lm15 `Response` for request calls, or a list of
+        # strings / dicts for list calls. Normalize all three.
         try:
-            if isinstance(outputs, list):
-                pieces = []
-                for item in outputs:
-                    if isinstance(item, str):
-                        pieces.append(item)
-                    elif isinstance(item, dict):
-                        pieces.append(item.get("text") or item.get("content") or str(item))
-                    else:
-                        pieces.append(str(item))
-                content = "\n---\n".join(pieces)
-            else:
-                content = str(outputs)
+            items = outputs if isinstance(outputs, list) else [outputs]
+            pieces = []
+            for item in items:
+                if hasattr(item, "message"):
+                    thinking = "".join(
+                        getattr(p, "text", "") for p in item.message.parts if getattr(p, "type", "") == "thinking"
+                    )
+                    text = response_text(item) or ""
+                    pieces.append(f"<think>{thinking}</think>\n{text}" if thinking else text)
+                elif isinstance(item, dict):
+                    pieces.append(item.get("text") or item.get("content") or str(item))
+                else:
+                    pieces.append(str(item))
+            content = "\n---\n".join(pieces)
         except Exception:
             content = repr(outputs)
 
@@ -144,15 +148,24 @@ class TraceCapture(BaseCallback):
 
 # -------- Per-run metric collection --------
 
-def _count_turns(trajectory: dict[str, Any]) -> int:
-    return sum(1 for k in trajectory if k.startswith("tool_name_"))
+def _history_tool_calls(pred: dspy.Prediction) -> list[Any]:
+    """The `ToolCalls` value from each recorded ReAct turn."""
+    history = getattr(pred, "history", None)
+    events = history.messages if history is not None else []
+    return [ev["tool_calls"] for ev in events if ev.get("tool_calls") is not None]
 
 
-def _count_tool_exec_failures(trajectory: dict[str, Any]) -> int:
+def _count_turns(pred: dspy.Prediction) -> int:
+    return len(_history_tool_calls(pred))
+
+
+def _count_tool_exec_failures(pred: dspy.Prediction) -> int:
     n = 0
-    for k, v in trajectory.items():
-        if k.startswith("observation_") and isinstance(v, str) and "Execution error" in v:
-            n += 1
+    for calls in _history_tool_calls(pred):
+        results = calls.tool_call_results
+        if results is None:
+            continue
+        n += sum(1 for r in results.tool_call_results if r.is_error)
     return n
 
 
@@ -204,6 +217,7 @@ def run_once(
         "max_iters_hit": False,
         "parse_failures": 0,
         "tool_exec_failures": 0,
+        "termination_reason": "",
         "task_succeeded": False,
         "judge_pass": "",
         "judge_reason": "",
@@ -217,13 +231,11 @@ def run_once(
             react = dspy.ReAct(signature, tools=list(scenario.tools), max_iters=max_iters)
             pred = react(question=scenario.question)
 
-        trajectory = getattr(pred, "trajectory", {}) or {}
-        turns = _count_turns(trajectory)
-        row["turns_completed"] = turns
-        # max_iters_hit: we made max_iters turns AND the last turn wasn't "finish".
-        last_tool = trajectory.get(f"tool_name_{max_iters - 1}")
-        row["max_iters_hit"] = turns >= max_iters and last_tool != "finish"
-        row["tool_exec_failures"] = _count_tool_exec_failures(trajectory)
+        row["turns_completed"] = _count_turns(pred)
+        row["termination_reason"] = getattr(pred, "termination_reason", "")
+        # ReAct forces a final submit when it runs out of turns.
+        row["max_iters_hit"] = row["turns_completed"] > max_iters
+        row["tool_exec_failures"] = _count_tool_exec_failures(pred)
         answer = getattr(pred, "answer", None)
         row["task_succeeded"] = _check_success(
             answer, scenario.golden_answer_substring
@@ -361,8 +373,12 @@ def main(argv: list[str] | None = None) -> int:
     # When reasoning_effort is set, drop it gracefully on providers that don't
     # support it (e.g. OpenRouter) rather than crashing.
     if args.reasoning_effort:
-        import litellm
-        litellm.drop_params = True
+        try:
+            import litellm
+
+            litellm.drop_params = True
+        except ImportError:
+            pass
 
     lm_kwargs: dict = dict(
         model=args.model,
@@ -433,6 +449,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"run {i}: turns={row['turns_completed']} "
                 f"parse_fail={row['parse_failures']} "
                 f"tool_fail={row['tool_exec_failures']} "
+                f"end={row['termination_reason']} "
                 f"ok={row['task_succeeded']}{judge_bit}"
                 + (f" err={row['error']}" if row["error"] else "")
             )

@@ -1,8 +1,11 @@
 # harness/analyze.py
 """Summarize all CSVs under harness/results/ as a markdown table comparing
 adapters across scenarios. Shows both the cheap substring-match task_success
-and the LLM-judge verdict when `--use-judge` was enabled during runs."""
+and the LLM-judge verdict when `--use-judge` was enabled during runs.
+
+Pass a directory as the first argument to summarize CSVs there instead."""
 import csv
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -20,8 +23,9 @@ def _rate(rows: list[dict], col: str) -> float | None:
 
 
 def main():
+    results_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else RESULTS_DIR
     cells = defaultdict(list)
-    for path in sorted(RESULTS_DIR.glob("*.csv")):
+    for path in sorted(results_dir.glob("*.csv")):
         with open(path) as f:
             for row in csv.DictReader(f):
                 key = (row["scenario"], row["adapter"])

@@ -1,0 +1,6 @@
+scenario,adapter,run_idx,turns_completed,max_iters_hit,parse_failures,tool_exec_failures,termination_reason,task_succeeded,judge_pass,judge_reason,error
+s_code_write_and_run,qwen,0,3,False,0,0,submit,True,,,
+s_code_write_and_run,qwen,1,3,False,0,0,submit,True,,,
+s_code_write_and_run,qwen,2,3,False,0,0,submit,True,,,
+s_code_write_and_run,qwen,3,3,False,0,0,submit,True,,,
+s_code_write_and_run,qwen,4,3,False,0,0,submit,True,,,

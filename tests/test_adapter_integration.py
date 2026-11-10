@@ -1,19 +1,45 @@
 import dspy
 import pytest
-from dspy.adapters.types.tool import Tool
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
+from dspy.lm15 import Message, Response, TextPart, ThinkingPart, Usage
+from dspy.utils.dummies import DummyLM
+from dspy.utils.exceptions import AdapterParseError
+
 from dspy_qwen_adapter import QwenAdapter
+from dspy_qwen_adapter.adapter import _ACTIVE_TOOLS
 
 
-def _sample_signature_with_tools():
-    class Sig(dspy.Signature):
-        """Answer the question."""
-        question: str = dspy.InputField()
-        tools: list[Tool] = dspy.InputField()
-        trajectory: str = dspy.InputField()
-        next_thought: str = dspy.OutputField()
-        next_tool_name: str = dspy.OutputField()
-        next_tool_args: dict = dspy.OutputField()
-    return Sig
+def get_weather(city: str) -> str:
+    """Get the weather for a city."""
+    return f"Weather in {city}: sunny, 72F."
+
+
+def _react_signature():
+    """The inner signature `dspy.ReAct` builds for `question -> answer`."""
+    return dspy.ReAct("question -> answer", tools=[get_weather]).react.signature
+
+
+def _react_inputs(question="What's the weather in Tokyo?"):
+    react = dspy.ReAct("question -> answer", tools=[get_weather])
+    return {
+        "question": question,
+        "history": dspy.History(messages=[]),
+        "tools": list(react.tools.values()),
+        "turn_budget": "Turn 1 of 20 (19 more after this one).",
+    }
+
+
+def _response(*parts):
+    return Response(
+        id="r1",
+        model="m",
+        message=Message(role="assistant", parts=parts),
+        finish_reason="stop",
+        usage=Usage(),
+    )
+
+
+# -------- construction --------
 
 
 def test_adapter_instantiates():
@@ -23,190 +49,136 @@ def test_adapter_instantiates():
 
 
 def test_adapter_accepts_strict_parse_flag():
-    a = QwenAdapter(strict_parse=True)
-    assert a.strict_parse is True
+    assert QwenAdapter(strict_parse=True).strict_parse is True
 
 
-def test_parse_happy_path_returns_react_fields():
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-    completion = (
-        "I should check.\n"
-        "<function=get_weather><parameter=city>Tokyo</parameter></function>"
+# -------- parse --------
+
+
+def test_parse_returns_thought_and_tool_calls():
+    out = QwenAdapter().parse(
+        _react_signature(),
+        "I should check.\n<function=get_weather><parameter=city>Tokyo</parameter></function>",
     )
-    out = a.parse(sig, completion)
     assert out["next_thought"] == "I should check."
-    assert out["next_tool_name"] == "get_weather"
-    assert out["next_tool_args"] == {"city": "Tokyo"}
+    assert isinstance(out["tool_calls"], ToolCalls)
+    call = out["tool_calls"].tool_calls[0]
+    assert (call.name, call.args) == ("get_weather", {"city": "Tokyo"})
 
 
 def test_parse_strips_think_before_splitting():
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-    completion = (
-        "<think>internal</think>"
-        "I should check.\n"
-        "<function=get_weather><parameter=city>Tokyo</parameter></function>"
+    out = QwenAdapter().parse(
+        _react_signature(),
+        "<think>internal</think>I should check.\n"
+        "<function=get_weather><parameter=city>Tokyo</parameter></function>",
     )
-    out = a.parse(sig, completion)
-    assert "internal" not in out["next_thought"]
     assert out["next_thought"] == "I should check."
 
 
-def test_format_produces_system_with_tools_block():
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-
-    def get_weather(city: str) -> str:
-        """Get the weather for a city."""
-        return "sunny"
-
-    messages = a.format(
-        signature=sig,
-        demos=[],
-        inputs={
-            "question": "What's in Tokyo?",
-            "tools": [Tool(get_weather)],
-            "trajectory": "",
-        },
+def test_parse_excludes_tool_call_wrapper_from_thought():
+    out = QwenAdapter().parse(
+        _react_signature(),
+        "Looking.\n<tool_call>\n<function=get_weather>\n<parameter=city>\nOslo\n</parameter>\n</function>\n</tool_call>",
     )
-    system = next(m for m in messages if m["role"] == "system")
-    assert "<tools>" in system["content"]
-    assert "get_weather" in system["content"]
+    assert out["next_thought"] == "Looking."
+    assert out["tool_calls"].tool_calls[0].args == {"city": "Oslo"}
 
 
-def test_format_assistant_message_replays_qwen_xml():
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-    content = a.format_assistant_message_content(
-        sig,
-        outputs={
-            "next_thought": "check weather",
-            "next_tool_name": "get_weather",
-            "next_tool_args": {"city": "Tokyo"},
-        },
+def test_parse_collects_multiple_calls():
+    out = QwenAdapter().parse(
+        _react_signature(),
+        "Both.\n<function=get_weather><parameter=city>A</parameter></function>"
+        "<function=get_weather><parameter=city>B</parameter></function>",
     )
-    assert "<tool_call>" in content
-    assert "<function=get_weather>" in content
-    assert "</tool_call>" in content
-    # Canonical Qwen 3.5 format puts the parameter value on its own lines.
-    assert "<parameter=city>\nTokyo\n</parameter>" in content
-    assert "check weather" in content
+    assert [c.args["city"] for c in out["tool_calls"].tool_calls] == ["A", "B"]
+
+
+def test_parse_decodes_args_against_tool_schema():
+    """String-typed params stay strings even when they look like JSON;
+    other types are JSON-decoded, matching the Qwen 3.5 chat template."""
+
+    def lookup(code: str, limit: int) -> str:
+        """Look up a code."""
+        return ""
+
+    token = _ACTIVE_TOOLS.set({"lookup": Tool(lookup)})
+    try:
+        out = QwenAdapter().parse(
+            _react_signature(),
+            "<function=lookup><parameter=code>\n007\n</parameter>"
+            "<parameter=limit>\n5\n</parameter></function>",
+        )
+    finally:
+        _ACTIVE_TOOLS.reset(token)
+    assert out["tool_calls"].tool_calls[0].args == {"code": "007", "limit": 5}
+
+
+def test_parse_accepts_hermes_json_tool_call():
+    """Qwen 3 (pre-3.5) models emit JSON inside <tool_call>."""
+    out = QwenAdapter().parse(
+        _react_signature(),
+        'Checking.\n<tool_call>\n{"name": "get_weather", "arguments": {"city": "Lima"}}\n</tool_call>',
+    )
+    assert out["next_thought"] == "Checking."
+    call = out["tool_calls"].tool_calls[0]
+    assert (call.name, call.args) == ("get_weather", {"city": "Lima"})
 
 
 def test_strict_parse_raises_when_no_call():
-    from dspy.utils.exceptions import AdapterParseError
-    a = QwenAdapter(strict_parse=True)
-    sig = _sample_signature_with_tools()
     with pytest.raises(AdapterParseError):
-        a.parse(sig, "Just some plain text")
+        QwenAdapter(strict_parse=True).parse(_react_signature(), "Just some plain text")
 
 
-def test_non_strict_returns_finish_when_no_call():
-    a = QwenAdapter(strict_parse=False)
-    sig = _sample_signature_with_tools()
-    out = a.parse(sig, "Plain answer")
-    assert out["next_tool_name"] == "finish"
+def test_non_strict_returns_empty_tool_calls_when_no_call():
+    out = QwenAdapter().parse(_react_signature(), "Plain answer")
+    assert out["tool_calls"].tool_calls == []
     assert out["next_thought"] == "Plain answer"
-    assert out["next_tool_args"] == {}
 
 
-def test_react_completes_with_qwen_adapter_and_dummy_lm():
-    """Run a full ReAct loop against DummyLM using QwenAdapter.
-    Verifies format+parse round-trip without any network."""
-    from dspy.utils.dummies import DummyLM
-
-    def get_weather(city: str) -> str:
-        """Get the weather for a city."""
-        return f"Weather in {city}: sunny, 72F."
-
-    lm = DummyLM(
-        [
-            # Turn 1: call get_weather
-            {"response": (
-                "I'll check Tokyo's weather.\n"
-                "<function=get_weather><parameter=city>Tokyo</parameter></function>"
-            )},
-            # Turn 2: finish
-            {"response": "I have the answer.\n<function=finish></function>"},
-            # Extract turn: non-ReAct signature, XMLAdapter-style field tags.
-            {"response": (
-                "<reasoning>\nTokyo's weather is sunny per the tool.\n</reasoning>\n"
-                "<answer>\nTokyo is sunny and 72F.\n</answer>"
-            )},
-        ]
-    )
-
-    with dspy.context(lm=lm, adapter=QwenAdapter()):
-        react = dspy.ReAct("question -> answer", tools=[get_weather])
-        pred = react(question="What's the weather in Tokyo?")
-
-    assert pred.trajectory["tool_name_0"] == "get_weather"
-    assert pred.trajectory["tool_args_0"] == {"city": "Tokyo"}
-    assert "sunny" in pred.trajectory["observation_0"]
-    assert pred.trajectory["tool_name_1"] == "finish"
-
-
-def test_parse_non_react_delegates_to_xml_adapter():
-    """Non-ReAct signatures (e.g., ChainOfThought extract, plain Predict)
-    go through XMLAdapter's <field>content</field> parser. strip_think
-    runs first to scrub any leaked reasoning."""
+def test_parse_non_tool_signature_delegates_to_xml_adapter():
     class Sig(dspy.Signature):
         """Answer the question."""
         question: str = dspy.InputField()
         reasoning: str = dspy.OutputField()
         answer: str = dspy.OutputField()
 
-    a = QwenAdapter()
-    completion = (
+    out = QwenAdapter().parse(
+        Sig,
         "<think>let me think</think>\n"
         "<reasoning>\nTokyo has mild spring weather.\n</reasoning>\n"
-        "<answer>\nTokyo is sunny and 72F.\n</answer>"
+        "<answer>\nTokyo is sunny and 72F.\n</answer>",
     )
-    out = a.parse(Sig, completion)
     assert out["reasoning"] == "Tokyo has mild spring weather."
     assert out["answer"] == "Tokyo is sunny and 72F."
 
 
-def test_format_react_signature_emits_xml_protocol_and_drops_json_directive():
-    """In ReAct mode, format() must (a) emit Qwen XML guidance and (b) NOT
-    leak ReAct's auto-generated 'next_tool_args must be in JSON format' line
-    from signature.instructions — that line is what causes Qwen to emit JSON."""
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
+# -------- format --------
 
-    def get_weather(city: str) -> str:
-        """Get the weather for a city."""
-        return "sunny"
 
-    messages = a.format(
-        signature=sig,
-        demos=[],
-        inputs={
-            "question": "What's in Tokyo?",
-            "tools": [Tool(get_weather)],
-            "trajectory": "",
-        },
-    )
-    system = next(m for m in messages if m["role"] == "system")["content"]
-    assert "<function=" in system
-    assert "<parameter=" in system
-    # The JSON directive from signature.instructions must NOT leak through.
-    assert "JSON" not in system and "json" not in system
+def test_format_tool_signature_builds_qwen_system_prompt():
+    prompt = QwenAdapter().format(_react_signature(), [], _react_inputs())
+    assert "<tools>" in prompt.system
+    assert "get_weather" in prompt.system
+    assert "<function=" in prompt.system
+    assert "`submit`" in prompt.system
+
+
+def test_format_user_message_omits_tools_history_and_footer():
+    prompt = QwenAdapter().format(_react_signature(), [], _react_inputs())
+    assert len(prompt.messages) == 1
+    user = prompt.messages[0].parts[0].text
+    assert "<question>\nWhat's the weather in Tokyo?\n</question>" in user
+    assert "<turn_budget>" in user
+    assert "<tools>" not in user
+    assert "Respond with" not in user
 
 
 def test_format_assistant_tool_call_is_canonical_qwen_35():
-    """The replayed assistant turn must match Qwen 3.5's trained chat_template
-    format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>...
-    </function></tool_call>."""
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-    content = a.format_assistant_message_content(
-        sig,
+    content = QwenAdapter().format_assistant_message_content(
+        _react_signature(),
         outputs={
             "next_thought": "",
-            "next_tool_name": "search",
-            "next_tool_args": {"query": "weather", "limit": 5},
+            "tool_calls": ToolCalls.from_dict_list([{"name": "search", "args": {"query": "weather", "limit": 5}}]),
         },
     )
     assert content == (
@@ -219,182 +191,206 @@ def test_format_assistant_tool_call_is_canonical_qwen_35():
     )
 
 
-def test_format_trajectory_renders_qwen_native_transcript():
-    """When format_user_message_content is called with a trajectory-shaped
-    input dict (ReAct's replay path), the output must be a Qwen-native
-    transcript: reasoning as prose, tool calls in canonical XML, observations
-    wrapped in <tool_response>."""
-    a = QwenAdapter()
+def test_format_assistant_includes_thought_before_call():
+    content = QwenAdapter().format_assistant_message_content(
+        _react_signature(),
+        outputs={
+            "next_thought": "check weather",
+            "tool_calls": ToolCalls.from_dict_list([{"name": "get_weather", "args": {"city": "Tokyo"}}]),
+        },
+    )
+    assert content.startswith("check weather\n<tool_call>")
+    assert "<parameter=city>\nTokyo\n</parameter>" in content
 
-    trajectory = {
-        "thought_0": "I should check the weather.",
-        "tool_name_0": "get_weather",
-        "tool_args_0": {"city": "Tokyo"},
-        "observation_0": "sunny, 72F",
-        "thought_1": "Got it. Done.",
-        "tool_name_1": "finish",
-        "tool_args_1": {},
-        "observation_1": "Completed.",
+
+def test_format_replays_history_as_qwen_transcript():
+    """A past ReAct turn renders as assistant <tool_call> XML followed by a
+    single user turn holding the <tool_response> and the next turn budget."""
+    calls = ToolCalls.from_dict_list([{"id": "c0", "name": "get_weather", "args": {"city": "Tokyo"}}])
+    results = ToolCallResults.from_tool_calls_and_values(calls, ["sunny, 72F"], [False])
+    history = dspy.History(messages=[{
+        "question": "What's the weather in Tokyo?",
+        "turn_budget": "Turn 1 of 20 (19 more after this one).",
+        "next_thought": "I should check.",
+        "tool_calls": calls.model_copy(update={"tool_call_results": results}),
+    }])
+    inputs = {**_react_inputs(), "history": history, "turn_budget": "Turn 2 of 20 (18 more after this one)."}
+    del inputs["question"]
+
+    prompt = QwenAdapter().format(_react_signature(), [], inputs)
+    roles = [m.role for m in prompt.messages]
+    assert roles == ["user", "assistant", "user"]
+
+    assistant = prompt.messages[1].parts[0].text
+    assert assistant.startswith("I should check.\n<tool_call>\n<function=get_weather>")
+
+    last_user = prompt.messages[2].parts[0].text
+    assert '<tool_response name="get_weather">\nsunny, 72F\n</tool_response>' in last_user
+    assert "Turn 2 of 20" in last_user
+
+
+def test_format_demos_use_qwen_xml():
+    demo = {
+        "question": "What is the weather in Paris?",
+        "turn_budget": "Turn 1 of 20 (19 more after this one).",
+        "next_thought": "Checking Paris.",
+        "tool_calls": ToolCalls.from_dict_list([{"name": "get_weather", "args": {"city": "Paris"}}]),
     }
-    sig = dspy.Signature(f"{', '.join(trajectory)} -> x")
-    rendered = a.format_user_message_content(sig, trajectory)
-
-    assert "<tool_call>\n<function=get_weather>" in rendered
-    assert "<parameter=city>\nTokyo\n</parameter>" in rendered
-    # The tool_response tag carries a name= attribute naming the tool that
-    # produced it — helps small models (4B) preserve tool-output provenance
-    # across the extract turn.
-    assert '<tool_response name="get_weather">\nsunny, 72F\n</tool_response>' in rendered
-    assert "<tool_call>\n<function=finish>\n</function>\n</tool_call>" in rendered
-    # Non-trajectory path delegates to XMLAdapter's <field>content</field>
-    # rendering — the whole point of inheriting from XMLAdapter so plain
-    # Predict signatures still have a structured output contract.
-    class Plain(dspy.Signature):
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-    plain_out = a.format_user_message_content(Plain, {"question": "hi"})
-    assert "<question>\nhi\n</question>" in plain_out
+    prompt = QwenAdapter().format(_react_signature(), [demo], _react_inputs())
+    assistants = [m for m in prompt.messages if m.role == "assistant"]
+    assert len(assistants) == 1
+    content = assistants[0].parts[0].text
+    assert "<function=get_weather>" in content
+    assert "<tool_calls>" not in content
+    assert "Paris" in prompt.messages[0].parts[0].text
 
 
-def test_postprocess_promotes_reasoning_content_when_text_empty():
-    """When LM Studio's reasoning parser routes everything into
-    reasoning_content and leaves text empty, we must fall back to using
-    reasoning_content so parse() runs instead of returning all-None.
+# -------- end-to-end --------
 
-    Non-ReAct path goes through XMLAdapter.parse which needs field tags;
-    the promoted reasoning_content here includes them, simulating a turn
-    where the model emitted <answer> inside reasoning mode."""
-    a = QwenAdapter()
 
-    class Sig(dspy.Signature):
-        """Answer."""
-        question: str = dspy.InputField()
-        reasoning: str = dspy.OutputField()
-        answer: str = dspy.OutputField()
+def test_react_completes_with_qwen_adapter_and_dummy_lm():
+    lm = DummyLM([
+        {"response": "I'll check Tokyo.\n<function=get_weather><parameter=city>Tokyo</parameter></function>"},
+        {"response": "Done.\n<function=submit><parameter=answer>72</parameter></function>"},
+    ])
+    with dspy.context(lm=lm, adapter=QwenAdapter()):
+        pred = dspy.ReAct("question -> answer", tools=[get_weather])(question="What's the weather in Tokyo?")
 
-    outputs = [{
-        "text": "",
-        "reasoning_content": (
-            "The user asked about Tokyo weather.\n"
-            "<reasoning>\nWeather lookup returned sunny.\n</reasoning>\n"
-            "<answer>\nTokyo is sunny.\n</answer>"
-        ),
-    }]
-    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
-    assert len(values) == 1
+    assert pred.termination_reason == "submit"
+    # `answer` is a string field, so "72" must not be JSON-decoded to an int.
+    assert pred.answer == "72"
+    first = pred.history.messages[0]["tool_calls"]
+    assert first.tool_calls[0].args == {"city": "Tokyo"}
+    assert "sunny" in str(first.tool_call_results)
+
+
+def test_react_forces_submit_after_plain_text_answer():
+    lm = DummyLM([
+        {"response": "It is sunny."},
+        {"response": "<function=submit><parameter=answer>sunny</parameter></function>"},
+    ])
+    with dspy.context(lm=lm, adapter=QwenAdapter()):
+        pred = dspy.ReAct("question -> answer", tools=[get_weather])(question="Weather?")
+    assert pred.termination_reason == "forced_submit"
+    assert pred.answer == "sunny"
+
+
+# -------- reasoning rescue --------
+
+
+class _AnswerSig(dspy.Signature):
+    """Answer."""
+    question: str = dspy.InputField()
+    reasoning: str = dspy.OutputField()
+    answer: str = dspy.OutputField()
+
+
+def test_postprocess_promotes_thinking_when_text_empty():
+    """LM Studio's reasoning parser can route the whole completion into the
+    thinking channel. The adapter promotes it so parse() has input."""
+    response = _response(ThinkingPart(
+        "The user asked about Tokyo.\n"
+        "<reasoning>\nLookup returned sunny.\n</reasoning>\n"
+        "<answer>\nTokyo is sunny.\n</answer>"
+    ))
+    values = QwenAdapter()._call_postprocess(_AnswerSig, _AnswerSig, [response])
     assert values[0]["answer"] == "Tokyo is sunny."
 
 
 def test_postprocess_passthrough_when_text_present():
-    """When text is non-empty, reasoning_content must be ignored — the
-    server has already split reasoning into a side channel and the visible
-    text is what the parser should consume."""
-    a = QwenAdapter()
-
-    class Sig(dspy.Signature):
-        """Answer."""
-        question: str = dspy.InputField()
-        reasoning: str = dspy.OutputField()
-        answer: str = dspy.OutputField()
-
-    outputs = [{
-        "text": (
-            "<reasoning>\nVisible reasoning.\n</reasoning>\n"
-            "<answer>\nVisible answer text.\n</answer>"
-        ),
-        "reasoning_content": "Hidden thinking that must NOT leak into the answer.",
-    }]
-    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
-    assert values[0]["answer"] == "Visible answer text."
-    assert "Hidden thinking" not in values[0]["answer"]
-
-
-def test_postprocess_noop_when_both_empty():
-    """If text is empty AND reasoning_content is empty/missing, fall through
-    to the base class (which assigns None to every output field)."""
-    a = QwenAdapter()
-
-    class Sig(dspy.Signature):
-        """Answer."""
-        question: str = dspy.InputField()
-        answer: str = dspy.OutputField()
-
-    outputs = [{"text": ""}]
-    values = a._call_postprocess(Sig, Sig, outputs, lm=None, lm_kwargs={})
-    assert values[0]["answer"] is None
-
-
-def test_react_demos_included_in_format_output():
-    """When an optimizer injects few-shot demos into a ReAct Predict, format()
-    must include them as multiturn messages between the system message and the
-    current user turn. Previously the ReAct branch silently dropped `demos`."""
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-
-    def get_weather(city: str) -> str:
-        """Get the weather for a city."""
-        return "sunny"
-
-    demo = {
-        "question": "What is the weather in Paris?",
-        "tools": [Tool(get_weather)],
-        "trajectory": "",
-        "next_thought": "I should look up Paris weather.",
-        "next_tool_name": "get_weather",
-        "next_tool_args": {"city": "Paris"},
-    }
-
-    messages = a.format(
-        signature=sig,
-        demos=[demo],
-        inputs={
-            "question": "What is the weather in Tokyo?",
-            "tools": [Tool(get_weather)],
-            "trajectory": "",
-        },
+    response = _response(
+        ThinkingPart("Hidden thinking that must NOT leak."),
+        TextPart("<reasoning>\nVisible.\n</reasoning>\n<answer>\nVisible answer.\n</answer>"),
     )
-
-    all_content = " ".join(m["content"] for m in messages)
-    # Demo thought and tool call must appear somewhere in the message list
-    assert "Paris" in all_content
-    assert "get_weather" in all_content
-    # There must be more than just [system, user] — demo turns were injected
-    assert len(messages) > 2
+    values = QwenAdapter()._call_postprocess(_AnswerSig, _AnswerSig, [response])
+    assert values[0]["answer"] == "Visible answer."
 
 
-def test_react_demo_assistant_turn_uses_qwen_xml():
-    """The assistant turn injected for a ReAct demo must use Qwen XML format
-    (<tool_call><function=...>) not XMLAdapter's <field> tags."""
-    a = QwenAdapter()
-    sig = _sample_signature_with_tools()
-
-    def get_weather(city: str) -> str:
-        """Get the weather for a city."""
-        return "sunny"
-
-    demo = {
-        "question": "What is the weather in Paris?",
-        "tools": [Tool(get_weather)],
-        "trajectory": "",
-        "next_thought": "Checking Paris.",
-        "next_tool_name": "get_weather",
-        "next_tool_args": {"city": "Paris"},
-    }
-
-    messages = a.format(
-        signature=sig,
-        demos=[demo],
-        inputs={
-            "question": "What is the weather in Tokyo?",
-            "tools": [Tool(get_weather)],
-            "trajectory": "",
-        },
+def test_postprocess_appends_tool_call_found_only_in_thinking():
+    sig = _react_signature()
+    response = _response(
+        ThinkingPart("<function=get_weather><parameter=city>Rome</parameter></function>"),
+        TextPart("Let me check Rome."),
     )
+    values = QwenAdapter()._call_postprocess(sig, sig, [response])
+    assert values[0]["tool_calls"].tool_calls[0].args == {"city": "Rome"}
 
-    assistant_messages = [m for m in messages if m["role"] == "assistant"]
-    assert len(assistant_messages) >= 1
-    content = assistant_messages[0]["content"]
-    # Must be Qwen XML format, not XMLAdapter's <next_tool_name> field tags
-    assert "<tool_call>" in content
-    assert "<function=get_weather>" in content
-    assert "<next_tool_name>" not in content
+
+def test_postprocess_raises_when_response_empty():
+    """DSPy 3.5 treats an empty completion as a parse error."""
+    with pytest.raises(AdapterParseError):
+        QwenAdapter()._call_postprocess(_AnswerSig, _AnswerSig, [_response(TextPart(""))])
+
+
+def test_postprocess_does_not_promote_deliberation():
+    """Thinking that only talks about the output tags (e.g. a model that ran
+    out of tokens mid-deliberation) must fail to parse, not yield a field
+    scraped from the reasoning."""
+    response = _response(ThinkingPart(
+        "The format says <answer>\n{answer}\n</answer>. Should I replace it? "
+        "Wait, maybe it means"
+    ))
+    with pytest.raises(AdapterParseError):
+        QwenAdapter()._call_postprocess(_AnswerSig, _AnswerSig, [response])
+
+
+def test_postprocess_reads_reasoning_text_from_responses_api_output():
+    """Over the Responses API, LM Studio puts Qwen's reasoning in
+    output[].content[].reasoning_text, which lm15 leaves out of ThinkingPart."""
+    import dataclasses
+
+    response = dataclasses.replace(
+        _response(ThinkingPart("")),
+        provider_data={"output": [{
+            "type": "reasoning",
+            "summary": [],
+            "content": [{
+                "type": "reasoning_text",
+                "text": "<reasoning>\nok\n</reasoning>\n<answer>\nParis\n</answer>",
+            }],
+        }]},
+    )
+    values = QwenAdapter()._call_postprocess(_AnswerSig, _AnswerSig, [response])
+    assert values[0]["answer"] == "Paris"
+
+
+def test_react_async_path_decodes_args_with_tool_schema():
+    import asyncio
+
+    def add(a: int, b: int) -> int:
+        """Add two integers."""
+        return a + b
+
+    lm = DummyLM([
+        {"response": "<function=add><parameter=a>2</parameter><parameter=b>3</parameter></function>"},
+        {"response": "<function=submit><parameter=answer>5</parameter></function>"},
+    ])
+
+    async def run():
+        with dspy.context(lm=lm, adapter=QwenAdapter()):
+            return await dspy.ReAct("question -> answer", tools=[add]).acall(question="2+3?")
+
+    pred = asyncio.run(run())
+    assert pred.answer == "5"
+    first = pred.history.messages[0]["tool_calls"]
+    assert first.tool_calls[0].args == {"a": 2, "b": 3}
+    assert first.tool_call_results.tool_call_results[0].value == 5
+
+
+def test_forced_submit_shows_only_submit_tool():
+    """ReAct forces `submit` with tool_choice when it runs out of turns. The
+    adapter enforces that in the prompt, since it sends no tools natively."""
+    lm = DummyLM([
+        {"response": "<function=get_weather><parameter=city>Tokyo</parameter></function>"},
+        {"response": "<function=submit><parameter=answer>sunny</parameter></function>"},
+    ])
+    with dspy.context(lm=lm, adapter=QwenAdapter()):
+        pred = dspy.ReAct("question -> answer", tools=[get_weather], max_iters=1)(question="Weather?")
+    assert pred.termination_reason == "forced_submit"
+
+    first_system = lm.history[0]["messages"][0]["content"]
+    forced_system = lm.history[1]["messages"][0]["content"]
+    assert '<tool name="get_weather">' in first_system
+    assert '<tool name="get_weather">' not in forced_system
+    assert '<tool name="submit">' in forced_system
+    assert "you must call `submit`" in forced_system

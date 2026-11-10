@@ -78,7 +78,18 @@ def test_prompt_react_mode_emits_xml_protocol_guidance():
     assert "get_weather" in prompt
     assert "<function=" in prompt
     assert "<parameter=" in prompt
-    assert "finish" in prompt
+    assert "finish" not in prompt
+
+
+def test_prompt_react_mode_adds_submit_guidance_only_with_submit_tool():
+    def submit(answer: str) -> str:
+        """Submit the final outputs."""
+        return answer
+
+    without = build_system_prompt("T", [_weather_tool()], react_fields=True)
+    with_submit = build_system_prompt("T", [_weather_tool(), Tool(submit)], react_fields=True)
+    assert "`submit`" not in without
+    assert "`submit`" in with_submit
 
 
 def test_prompt_react_mode_does_not_mention_json():

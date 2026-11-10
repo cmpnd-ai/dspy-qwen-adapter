@@ -4,7 +4,7 @@ Verifies the adapter produces parseable output when combined with:
 
 - dspy.Predict         — simplest: signature → answer
 - dspy.ChainOfThought  — reasoning + answer
-- dspy.RLM             — iterative code execution via an in-process REPL
+- dspy.RLM             — iterative code execution via a local REPL
 
 Not a benchmark — each test runs once, reports pass/fail + elapsed time,
 and only checks that output fields are populated sensibly. Total runtime
@@ -18,78 +18,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import contextlib
-import io
 import os
 import sys
 import time
-from typing import Any, Callable
+from typing import Callable
 
 import dspy
-from dspy.primitives.code_interpreter import CodeInterpreterError, FinalOutput
+from dspy.primitives import LocalInterpreter
 
 from dspy_qwen_adapter import QwenAdapter
-
-
-# -------- Minimal in-process code interpreter for the RLM smoke test --------
-
-class _SubmitSentinel(Exception):
-    """Raised by SUBMIT() to unwind the exec() call. Caught inside execute()."""
-
-
-class LocalPythonInterpreter:
-    """In-process Python interpreter that implements DSPy's CodeInterpreter
-    Protocol without requiring Deno/Pyodide. Executes code via `exec()` in
-    a persistent namespace; captures stdout; detects `SUBMIT()` calls and
-    returns a `FinalOutput`. For smoke-test use only — not sandboxed.
-    """
-
-    def __init__(self, tools: dict[str, Callable[..., str]] | None = None) -> None:
-        self._tools: dict[str, Callable[..., str]] = dict(tools or {})
-        self._ns: dict[str, Any] = {}
-        self._final: Any = None
-
-    @property
-    def tools(self) -> dict[str, Callable[..., str]]:
-        return self._tools
-
-    def start(self) -> None:
-        self._final = None
-
-        def _submit(value: Any = None) -> None:
-            self._final = FinalOutput(output=value)
-            raise _SubmitSentinel()
-
-        self._ns = {
-            "__builtins__": __builtins__,
-            "SUBMIT": _submit,
-            **self._tools,
-        }
-
-    def execute(
-        self,
-        code: str,
-        variables: dict[str, Any] | None = None,
-    ) -> Any:
-        if not self._ns:
-            self.start()
-        if variables:
-            self._ns.update(variables)
-
-        buf = io.StringIO()
-        try:
-            with contextlib.redirect_stdout(buf):
-                exec(compile(code, "<rlm-smoke>", "exec"), self._ns, self._ns)
-        except _SubmitSentinel:
-            return self._final
-        except Exception as e:
-            raise CodeInterpreterError(f"{type(e).__name__}: {e}") from e
-
-        out = buf.getvalue().strip()
-        return out or None
-
-    def shutdown(self) -> None:
-        self._ns = {}
 
 
 # -------- Shared helpers --------
@@ -144,17 +81,16 @@ def test_chain_of_thought(args: argparse.Namespace) -> tuple[bool, str]:
 def test_rlm(args: argparse.Namespace) -> tuple[bool, str]:
     """dspy.RLM must produce output after at least one successful iteration.
 
-    Uses the local in-process interpreter (no Deno/WASM dependency). Task
+    Uses DSPy's LocalInterpreter (no Deno/WASM dependency). Task
     is intentionally simple — sum a small list — so the LLM should finish
     in one or two iterations even at small model sizes.
     """
     lm = _build_lm(args)
-    interpreter = LocalPythonInterpreter()
     with dspy.context(lm=lm, adapter=QwenAdapter()):
         rlm = dspy.RLM(
             "numbers -> total",
-            max_iterations=3,
-            interpreter=interpreter,
+            max_iters=3,
+            interpreter_factory=LocalInterpreter,
         )
         try:
             pred = rlm(numbers="[1, 2, 3, 4, 5]")

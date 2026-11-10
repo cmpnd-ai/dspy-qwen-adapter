@@ -118,3 +118,73 @@ def coerce_args_to_schema(
         except (ValueError, TypeError):
             pass
     return out
+
+
+# Qwen 3 (pre-3.5) Hermes-style calls: <tool_call>{"name": ..., "arguments": {...}}</tool_call>
+_HERMES_BLOCK = re.compile(r"<tool_call>\s*(\{[\s\S]*?\})\s*</tool_call>")
+
+
+def _strip_param(raw: str) -> str:
+    """Drop the single newline the Qwen 3.5 template puts around values."""
+    if raw.startswith("\n"):
+        raw = raw[1:]
+    if raw.endswith("\n"):
+        raw = raw[:-1]
+    return raw
+
+
+def decode_for_schema(raw: str, schema: dict[str, Any] | None) -> Any:
+    """Decode a raw <parameter> value the way the Qwen 3.5 chat template
+    encodes it: strings are written verbatim, everything else as JSON."""
+    types = {schema.get("type")} if schema and "type" in schema else {
+        s.get("type") for s in (schema or {}).get("anyOf", [])
+    }
+    if "string" in types and types <= {"string", "null"}:
+        return _strip_param(raw).strip()
+    return _decode_value(raw)
+
+
+def split_thought_and_calls(
+    text: str,
+) -> tuple[str, list[tuple[str, dict[str, str]]]]:
+    """Split content into (thought, calls). Thought is the text before the
+    first call. Each call is (name, raw_args) with parameter values left as
+    undecoded strings so the caller can decode them against a tool schema.
+
+    Recognizes Qwen 3.5 `<function=NAME>` blocks first, then Qwen 3
+    Hermes-style JSON `<tool_call>` blocks."""
+    fn_matches = list(_FUNCTION_BLOCK.finditer(text))
+    if fn_matches:
+        first = fn_matches[0].start()
+        # Include an opening <tool_call> wrapper in the cut, if present.
+        opener = text.rfind("<tool_call>", 0, first)
+        cut = opener if opener != -1 and text[opener:first].strip() == "<tool_call>" else first
+        calls = [
+            (m.group(1), {p.group(1): p.group(2) for p in _PARAMETER_BLOCK.finditer(m.group(2))})
+            for m in fn_matches
+        ]
+        return text[:cut].strip(), calls
+
+    calls = []
+    hermes_matches = list(_HERMES_BLOCK.finditer(text))
+    for m in hermes_matches:
+        try:
+            payload = json.loads(m.group(1))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict) or "name" not in payload:
+            continue
+        args = payload.get("arguments") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                args = {}
+        # Hermes args are already JSON-typed; re-serialize non-strings so
+        # decode_for_schema treats both formats the same way.
+        raw = {k: v if isinstance(v, str) else json.dumps(v) for k, v in args.items()}
+        calls.append((payload["name"], raw))
+    if calls:
+        return text[: hermes_matches[0].start()].strip(), calls
+
+    return text.strip(), []

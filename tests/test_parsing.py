@@ -173,3 +173,48 @@ def test_fixture_parses_to_expected(txt_path, json_path):
         assert call is not None
         assert call[0] == expected["tool_name"]
         assert call[1] == expected["tool_args"]
+
+
+# -------- multi-call and schema-aware decoding --------
+
+from dspy_qwen_adapter.parsing import decode_for_schema, split_thought_and_calls  # noqa: E402
+
+
+def test_split_calls_returns_raw_values():
+    thought, calls = split_thought_and_calls(
+        "Go.\n<function=f><parameter=n>\n5\n</parameter></function>"
+    )
+    assert thought == "Go."
+    assert calls == [("f", {"n": "\n5\n"})]
+
+
+def test_split_calls_no_call():
+    assert split_thought_and_calls("  just text ") == ("just text", [])
+
+
+def test_split_calls_hermes_reserializes_non_strings():
+    _, calls = split_thought_and_calls(
+        '<tool_call>{"name": "f", "arguments": {"n": 5, "s": "x"}}</tool_call>'
+    )
+    assert calls == [("f", {"n": "5", "s": "x"})]
+
+
+def test_split_calls_hermes_ignores_bad_json():
+    assert split_thought_and_calls("<tool_call>{not json}</tool_call>")[1] == []
+
+
+def test_decode_string_schema_keeps_text():
+    assert decode_for_schema("\n42\n", {"type": "string"}) == "42"
+
+
+def test_decode_optional_string_schema_keeps_text():
+    schema = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+    assert decode_for_schema("[1]", schema) == "[1]"
+
+
+def test_decode_non_string_schema_parses_json():
+    assert decode_for_schema("\n[1, 2]\n", {"type": "array"}) == [1, 2]
+
+
+def test_decode_without_schema_falls_back_to_json():
+    assert decode_for_schema("true", None) is True

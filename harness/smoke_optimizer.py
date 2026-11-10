@@ -177,19 +177,22 @@ def main(argv: list[str] | None = None) -> int:
               "the model may have failed every training example.")
     else:
         for i, d in enumerate(demos):
-            tool = d.get("next_tool_name", "?")
+            calls = d.get("tool_calls")
+            tools = [c.name for c in calls.tool_calls] if calls is not None else []
             thought = _truncate(d.get("next_thought", ""), 60)
-            print(f"      demo[{i}]: tool={tool!r}  thought={thought!r}")
+            print(f"      demo[{i}]: tools={tools!r}  thought={thought!r}")
 
     # ── 4. FORMAT check: call format() directly with the bootstrapped demos ──
     # This confirms demos survive the adapter without running a full LM call.
     react_sig = optimized.react.signature
     sample_inputs = {
         "question": TEST_QUESTION,
-        "trajectory": "",
+        "history": dspy.History(messages=[]),
+        "tools": list(optimized.tools.values()),
+        "turn_budget": "Turn 1 of 6 (5 more after this one).",
     }
-    messages_with_demos = adapter.format(react_sig, demos, sample_inputs)
-    messages_without = adapter.format(react_sig, [], sample_inputs)
+    messages_with_demos = adapter.format(react_sig, demos, sample_inputs).messages
+    messages_without = adapter.format(react_sig, [], sample_inputs).messages
     format_ok = len(messages_with_demos) > len(messages_without)
 
     print()

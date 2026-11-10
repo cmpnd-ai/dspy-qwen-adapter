@@ -34,16 +34,43 @@ This adapter:
   passes `tools=[]`), so it works even on servers whose native Qwen
   parsers have known bugs.
 - **Strips leaked `<think>` tags** from completions before parsing.
-- **Rescues empty `text` turns** by falling back to `reasoning_content`
-  — important for thinking-mode models on LM Studio, where the server
-  can route the entire completion into a side channel and leave `text`
-  empty.
+- **Rescues empty `text` turns** by falling back to the model's reasoning
+  text when that text holds the answer. This matters for thinking-mode
+  models on LM Studio, where the server can route the entire completion
+  into the reasoning channel and leave `text` empty.
 - **Inherits `XMLAdapter`** for plain `dspy.Predict` / `ChainOfThought` —
   non-tool-calling paths get `<field>content</field>` tags, which is
   still in Qwen's XML-heavy training distribution, plus demos and
   `dspy.History` support for free.
 
 ## Benchmark results
+
+### DSPy 3.5, small Qwen models
+
+240 QwenAdapter runs on DSPy 3.5.0 against LM Studio: 8 scenarios × 5 runs
+× 6 model configurations, plus a stock `ChatAdapter` baseline on
+qwen3.5-4b. Cells show runs that passed the substring check. No
+QwenAdapter run had a parse failure.
+
+| scenario | qwen3.5-0.8b | qwen3.5-0.8b (thinking off) | qwen3.5-4b | qwen3.5-9b | qwen3-4b-2507 | qwen3-4b | qwen3.5-4b (ChatAdapter) |
+|---|---|---|---|---|---|---|---|
+| s1 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s3 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s10 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s_sql | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s_code | 0/5 | 0/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s_echo | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s_deep | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 |
+| s_i18n | 0/5 | 0/5 | 0/5 | 0/5 | 0/5 | 0/5 | 5/5 |
+
+- **s_code on 0.8B:** the model retries `run_python` until its turns run
+  out, then ignores the forced `submit` turn.
+- **s_i18n:** the mock `translate` tool returns English text. With
+  QwenAdapter the models notice, retry, and often submit their own
+  translation without the mock's `[translated to SPANISH]` tag. The
+  substring metric scores that as a miss.
+
+### DSPy 3.1
 
 880 total runs: 4 adapters × 8 scenarios × 5 runs × 3 models, each scored
 by an LLM judge. See [docs/benchmarks.md](docs/benchmarks.md) for
@@ -60,7 +87,7 @@ methodology, per-cell reasoning, and limitations.
 - ⚠ marks cells where every run had a parse failure (adapter couldn't
   extract output fields from the LM response).
 
-### qwen3.5-35b-a3b
+#### qwen3.5-35b-a3b
 
 **Task success**
 
@@ -88,7 +115,7 @@ methodology, per-cell reasoning, and limitations.
 | s_deep | 0.60 | 0.20 | **2.20** | **0.00** |
 | s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
-### qwen3.5-4b
+#### qwen3.5-4b
 
 **Task success**
 
@@ -116,7 +143,7 @@ methodology, per-cell reasoning, and limitations.
 | s_deep | **1.00** | 0.00 | 0.00 | **0.00** |
 | s_i18n | 0.00 | 0.00 | 0.00 | **0.00** |
 
-### qwen3-4b (out-of-distribution — Hermes-format model)
+#### qwen3-4b (out-of-distribution — Hermes-format model)
 
 Qwen 3 was trained on [Hermes-style](https://qwen.readthedocs.io/en/latest/framework/function_call.html)
 tool calls, not the XML format this adapter prompts for. The benchmark
@@ -153,7 +180,7 @@ weak-model + mock-tool artifacts — the model hallucinates lengths or
 paraphrases narrative prefixes regardless of adapter. Not a production
 tool-calling regression. See [docs/benchmarks.md](docs/benchmarks.md).)*
 
-### Headline findings
+#### Headline findings
 
 - **0 parse failures across all 600 qwen-adapter runs on all three models.**
   XMLAdapter by comparison failed every `s3` run on 35B and every `s_code`
@@ -226,11 +253,14 @@ QwenAdapter(
     callbacks=None,                 # list[BaseCallback] — standard DSPy callbacks
     native_response_types=None,     # list[type] — forwarded to base Adapter
     strict_parse=False,             # True: raise AdapterParseError when no tool call
-                                    # is present. False (default): treat as a
-                                    # graceful finish — the model's text becomes
-                                    # the thought, and ReAct moves to extract.
+                                    # is present. False (default): return no tool
+                                    # calls, so ReAct asks the model to `submit`.
 )
 ```
+
+The adapter handles any signature with a `dspy.ToolCalls` output field,
+which includes the signature `dspy.ReAct` builds. Past turns in
+`dspy.History` replay as Qwen `<tool_call>` / `<tool_response>` turns.
 
 `use_native_function_calling` is hardcoded off — we never pass `tools=[]`
 to the server, which is what makes this adapter robust across servers with
@@ -243,12 +273,14 @@ different Qwen tool-parser quirks.
   compliance. Smaller variants (4B and below) can have weak-model
   artifacts on narrative-mock benchmarks but still post the best
   tool_fail rates.
-- **Server**: any OpenAI-compatible `chat/completions` endpoint. Tested
-  against LM Studio 0.4.x; should work against vLLM, SGLang, llama.cpp,
-  and Ollama without any server-specific flags, since this adapter
-  doesn't rely on native function calling.
+- **Server**: any OpenAI-compatible endpoint. Tested against LM Studio
+  0.4.x over both the Responses API (DSPy 3.5's default for `openai/`
+  models) and `chat/completions` (`model_type="chat"`). It should work
+  against vLLM, SGLang, llama.cpp, and Ollama without server-specific
+  flags, since this adapter doesn't rely on native function calling.
 - **Python**: 3.12+.
-- **DSPy**: 3.1+.
+- **DSPy**: 3.5+. DSPy 3.5 replaced `dspy.ReAct` and moved adapters onto
+  lm15 messages. Use `dspy-qwen-adapter` 0.0.3 with DSPy 3.1–3.4.
 
 ## How it's different
 
@@ -257,7 +289,7 @@ different Qwen tool-parser quirks.
 | Tool call format | `[[ ## field ## ]]` delimiters | JSON text (+ `response_format`) | `<field>content</field>` per output | canonical Qwen `<tool_call>` XML |
 | Trajectory replay | flat `name: value` lines | flat JSON per turn | `<field>` lines per turn | `<tool_call>` + `<tool_response name="...">` XML per turn |
 | `<think>` tag handling | — | — | — | stripped before parsing |
-| Empty-text (thinking mode) | drops the turn (all fields None) | drops the turn | drops the turn | falls back to `reasoning_content` |
+| Empty-text (thinking mode) | parse error | parse error | parse error | falls back to reasoning text that holds the answer |
 | Server native tool parser | not used | used when `response_format` is supported | not used | not used (by design) |
 | Plain `dspy.Predict` | works | works | works | works (via XMLAdapter inheritance) |
 
@@ -271,10 +303,9 @@ See [docs/benchmarks.md](docs/benchmarks.md) for the measured effect of each.
   may be faster. The benchmarks show this adapter is at worst equivalent
   and at best dramatically better, at the cost of parsing tool calls in
   Python instead of at the server.
-- **No demo / few-shot support on the ReAct path.** DSPy optimizers that
-  rely on demo interleaving (BootstrapFewShot, MIPRO) will silently get
-  zero-shot behavior on ReAct calls. Plain `Predict` inherits demo
-  support from `XMLAdapter`. Tracking as a future enhancement.
+- **ReAct demos show one turn each.** Optimizers such as BootstrapFewShot
+  record one demo per ReAct turn. Each demo renders that turn's inputs and
+  its tool call, but not the earlier turns in its history.
 - **Non-streaming only.** Streaming parsers for Qwen are buggy in most
   current inference stacks; this adapter targets non-streaming responses.
 - **Small-model quirks.** The 4B-class models occasionally paraphrase
@@ -282,6 +313,9 @@ See [docs/benchmarks.md](docs/benchmarks.md) for the measured effect of each.
   benchmark scenarios (`s_echo`, `s_i18n`). Not a production
   tool-calling regression — real tools return real data. Bigger models
   (35B+) pass these cleanly.
+- **Qwen 3.5 0.8B overthinks plain `Predict`.** With thinking on, it can
+  spend its whole token budget deliberating over the output format, with
+  any adapter. Pass `reasoning_effort="none"` to `dspy.LM` for this model.
 
 ## Development
 

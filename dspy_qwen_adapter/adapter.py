@@ -1,154 +1,219 @@
+import dataclasses
+import json
 import logging
-from typing import Any
+from contextvars import ContextVar
+from typing import Any, get_origin
 
 from dspy.adapters.base import Adapter as _BaseAdapter
+from dspy.adapters.base import Prompt
+from dspy.adapters.types.tool import Tool, ToolCallResults, ToolCalls
 from dspy.adapters.xml_adapter import XMLAdapter
+from dspy.lm15 import Message, TextPart, ThinkingPart
 from dspy.signatures.signature import Signature
 from dspy.utils.callback import BaseCallback
+from dspy.utils.exceptions import AdapterParseError
 
 from dspy_qwen_adapter.parsing import (
+    decode_for_schema,
+    split_thought_and_calls,
     strip_think,
-    split_thought_and_call,
 )
 from dspy_qwen_adapter.prompts import build_system_prompt
 
 logger = logging.getLogger(__name__)
 
 # DSPy's `Adapter.__init_subclass__` wraps `format` and `parse` with
-# `with_callbacks` on every subclass. That re-wraps inherited methods: by the
-# time we reach `QwenAdapter`, `XMLAdapter.format` is already double-wrapped
-# (once for ChatAdapter + once for XMLAdapter), and a naive `super().format()`
-# call would emit two extra callback spans on top of our own wrapper.
-#
-# Hold direct references to the unwrapped implementations so we can invoke
-# them without dragging the extra span layers along. XMLAdapter's XML-tag
-# formatting comes from its overridden hooks (format_field_structure,
-# format_field_with_value, etc.), which are still resolved via MRO on `self`
-# — so calling `_BaseAdapter.format(self, ...)` produces XML-tagged output
-# with only one span per call.
+# `with_callbacks` on every subclass, so inherited methods arrive here already
+# wrapped once per ancestor. Calling the unwrapped implementations keeps one
+# callback span per call. XMLAdapter's hooks still resolve through `self`.
 _ADAPTER_FORMAT = _BaseAdapter.format  # unwrapped; Adapter itself is never a subclass
 _XML_PARSE_UNWRAPPED = XMLAdapter.parse.__wrapped__
 
-REACT_TOOL_FIELDS = {"next_thought", "next_tool_name", "next_tool_args"}
+# Tools for the in-flight call, keyed by name. `parse()` reads their schemas to
+# decode <parameter> values. Set in `_call_preprocess`, which sees the inputs.
+_ACTIVE_TOOLS: ContextVar[dict[str, Tool]] = ContextVar("qwen_adapter_active_tools", default={})
 
-# Phrases in ReAct's auto-generated signature.instructions that push the model
-# toward the wrong output format for this adapter. We strip lines containing
-# any of these before prepending the instructions to our Qwen-native system
-# prompt. Other ReAct framing (agent role, goal, tool enumeration) is kept.
-_REACT_OUTPUT_FORMAT_CUES = (
-    "JSON", "json",
-    "next_thought", "next_tool_name", "next_tool_args",
-)
+# Tool named by a `tool_choice` option for the in-flight call (e.g. ReAct's
+# forced `submit`). The adapter never sends tools to the server, so it
+# enforces the choice in the prompt instead.
+_FORCED_TOOL: ContextVar[str | None] = ContextVar("qwen_adapter_forced_tool", default=None)
 
 
-def _scrub_react_format_directives(instructions: str) -> str:
-    """Remove lines that reference ReAct's field-named output protocol.
-
-    ReAct's generated instructions tell the model to "interleave next_thought,
-    next_tool_name, and next_tool_args" and to format args "in JSON format".
-    Qwen anchors on those cues and produces JSON or pseudo-YAML. Dropping
-    those lines lets our _REACT_GUIDANCE (appended later in the system
-    prompt by build_system_prompt) be the sole authority on output format.
-    """
-    if not instructions:
-        return ""
-    return "\n".join(
-        ln for ln in instructions.splitlines()
-        if not any(cue in ln for cue in _REACT_OUTPUT_FORMAT_CUES)
-    )
+def _forced_tool_name(tool_choice: Any) -> str | None:
+    """The function name a `tool_choice` value requires, if any."""
+    if isinstance(tool_choice, dict):
+        function = tool_choice.get("function")
+        if isinstance(function, dict) and function.get("name"):
+            return function["name"]
+        return tool_choice.get("name")
+    return None
 
 
-_TRAJECTORY_PREFIXES = ("thought_", "tool_name_", "tool_args_", "observation_")
+def _tool_calls_field(signature: type[Signature]) -> str | None:
+    """Name of the `dspy.ToolCalls` output field, if the signature has one."""
+    for name, field in signature.output_fields.items():
+        if field.annotation == ToolCalls:
+            return name
+    return None
 
 
-def _is_react_signature(signature: type[Signature]) -> bool:
-    """True when a signature has ReAct's three augmented output fields."""
-    return REACT_TOOL_FIELDS.issubset(signature.output_fields.keys())
+def _tools_field(signature: type[Signature]) -> str | None:
+    """Name of the `list[dspy.Tool]` or `dspy.Tool` input field, if any."""
+    for name, field in signature.input_fields.items():
+        if field.annotation == Tool:
+            return name
+        if get_origin(field.annotation) is list and field.annotation.__args__[0] == Tool:
+            return name
+    return None
+
+
+def _is_tool_signature(signature: type[Signature]) -> bool:
+    """True for signatures that ask the model to call tools (e.g. `dspy.ReAct`)."""
+    return _tool_calls_field(signature) is not None
+
+
+def _thought_field(signature: type[Signature]) -> str | None:
+    """The output field that carries prose reasoning on a tool-calling turn."""
+    tc_field = _tool_calls_field(signature)
+    for name in signature.output_fields:
+        if name != tc_field:
+            return name
+    return None
+
+
+def _as_tool_list(value: Any) -> list[Tool]:
+    if not value:
+        return []
+    return list(value) if isinstance(value, list) else [value]
 
 
 def _render_tool_call(name: str, args: dict[str, Any]) -> str:
-    """Render a (tool_name, args) pair in Qwen 3.5's canonical chat-template
-    XML format: <tool_call><function=NAME><parameter=K>\\nVALUE\\n</parameter>
-    ...</function></tool_call> with values on their own lines.
+    """Render one call in Qwen 3.5's chat-template XML: values sit on their own
+    lines, strings verbatim and everything else as JSON."""
 
-    Mirrors the tokenizer_config.json chat_template for Qwen 3.5 (and the
-    Qwen3-Coder lineage it inherits from)."""
-    params = "".join(
-        f"<parameter={k}>\n{v}\n</parameter>\n" for k, v in args.items()
-    )
+    def fmt(v: Any) -> str:
+        return v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)
+
+    params = "".join(f"<parameter={k}>\n{fmt(v)}\n</parameter>\n" for k, v in args.items())
     return f"<tool_call>\n<function={name}>\n{params}</function>\n</tool_call>"
 
 
-def _is_react_trajectory(inputs: dict[str, Any]) -> bool:
-    """True when the inputs dict looks like a ReAct trajectory (keys of the
-    form thought_N / tool_name_N / tool_args_N / observation_N). ReAct's
-    _format_trajectory passes the trajectory dict here to get a text blob
-    for the next turn's user message."""
-    if not inputs:
-        return False
-    return any(str(k).startswith(_TRAJECTORY_PREFIXES) for k in inputs)
+def _render_tool_responses(results: ToolCallResults) -> str:
+    """Render tool results as Qwen <tool_response> blocks. The `name` attribute
+    is an addition to Qwen's bare template that keeps provenance clear when a
+    turn has several results."""
+    blocks = []
+    for result in results.tool_call_results:
+        value = result.value
+        if not isinstance(value, str):
+            try:
+                value = json.dumps(value, ensure_ascii=False, default=str)
+            except TypeError:
+                value = str(value)
+        blocks.append(f'<tool_response name="{result.name}">\n{value}\n</tool_response>')
+    return "\n".join(blocks)
 
 
-def _render_react_trajectory(trajectory: dict[str, Any]) -> str:
-    """Render a ReAct trajectory as a Qwen-native transcript: each turn's
-    reasoning as plain text, the tool call in canonical XML, and the
-    observation wrapped in <tool_response>.
+def _merge_user_turns(messages: tuple[Message, ...]) -> tuple[Message, ...]:
+    """Join adjacent text-only user messages. ReAct history yields a tool-result
+    turn followed by the next turn's inputs; Qwen expects a single user turn."""
+    merged: list[Message] = []
+    for msg in messages:
+        prev = merged[-1] if merged else None
+        if (
+            prev is not None
+            and prev.role == "user"
+            and msg.role == "user"
+            and all(isinstance(p, TextPart) for p in prev.parts + msg.parts)
+        ):
+            text = "\n\n".join(p.text for p in prev.parts + msg.parts)
+            merged[-1] = Message.user(text)
+        else:
+            merged.append(msg)
+    return tuple(merged)
 
-    Turns are grouped by the integer suffix on the keys (thought_0,
-    tool_name_0, etc.). Missing pieces of a turn are silently skipped.
 
-    The <tool_response> tag carries a `name` attribute identifying which
-    tool produced the response. This is a slight deviation from Qwen 3.5's
-    bare canonical chat template (which does not include attributes on
-    tool_response). We add it for debugging / multi-tool provenance; the
-    parsing side doesn't depend on it."""
-    turn_idxs: list[int] = sorted({
-        int(k.rsplit("_", 1)[1])
-        for k in trajectory
-        if str(k).startswith(_TRAJECTORY_PREFIXES)
-        and k.rsplit("_", 1)[1].isdigit()
-    })
-    parts: list[str] = []
-    for i in turn_idxs:
-        thought = trajectory.get(f"thought_{i}", "")
-        name = trajectory.get(f"tool_name_{i}", "")
-        args = trajectory.get(f"tool_args_{i}", {}) or {}
-        obs = trajectory.get(f"observation_{i}", None)
-        if thought:
-            parts.append(str(thought).strip())
-        if name:
-            parts.append(_render_tool_call(name, args))
-        if obs is not None:
-            attr = f' name="{name}"' if name else ""
-            parts.append(f"<tool_response{attr}>\n{obs}\n</tool_response>")
-    return "\n".join(parts)
+def _thinking_text(response: Any) -> str:
+    """The model's reasoning text.
+
+    Over the OpenAI Responses API, LM Studio returns Qwen's reasoning in
+    `content[].reasoning_text` with an empty `summary`, and lm15 only maps the
+    summary into `ThinkingPart`. Fall back to the raw output items then.
+    """
+    thinking = "".join(p.text for p in response.message.parts if isinstance(p, ThinkingPart))
+    if thinking:
+        return thinking
+    output = (response.provider_data or {}).get("output")
+    if not isinstance(output, list):
+        return ""
+    return "".join(
+        block.get("text", "")
+        for item in output
+        if isinstance(item, dict) and item.get("type") == "reasoning"
+        for block in item.get("content") or []
+        if isinstance(block, dict) and block.get("type") == "reasoning_text"
+    )
+
+
+def _holds_answer(thinking: str, signature: type[Signature]) -> bool:
+    """True when the thinking text carries a usable answer, not just
+    deliberation that happens to mention the output tags."""
+    if _is_tool_signature(signature):
+        return "<function=" in thinking or "<tool_call>" in thinking
+    fields = list(signature.output_fields)
+    return bool(fields) and thinking.rstrip().endswith(f"</{fields[-1]}>")
+
+
+def _rescue_reasoning(response: Any, signature: type[Signature]) -> Any:
+    """Move answer text out of the thinking channel when the server's
+    reasoning parser put it there.
+
+    Two cases:
+    1. No visible text: the parser consumed the whole completion. Promote the
+       thinking text so `parse()` has something to read, but only when it
+       holds an answer. A model that ran out of tokens mid-deliberation should
+       fail to parse, not yield fields scraped from its reasoning.
+    2. Tool-calling turn whose visible text has no call while the thinking
+       text does: append the thinking text so the call can be found.
+    """
+    parts = response.message.parts
+    text = "".join(p.text for p in parts if isinstance(p, TextPart))
+    thinking = _thinking_text(response)
+    tool_signature = _is_tool_signature(signature)
+    if not thinking or not _holds_answer(thinking, signature):
+        return response
+
+    if not text.strip():
+        new_text = thinking
+        logger.debug("QwenAdapter: text was empty; promoted %d chars of thinking.", len(thinking))
+    elif tool_signature and "<function=" not in text and "<function=" in thinking:
+        new_text = text + "\n" + thinking
+        logger.debug("QwenAdapter: tool call found only in thinking; appended %d chars.", len(thinking))
+    else:
+        return response
+
+    kept = tuple(p for p in parts if not isinstance(p, TextPart))
+    message = Message(role="assistant", parts=kept + (TextPart(new_text),))
+    return dataclasses.replace(response, message=message)
 
 
 class QwenAdapter(XMLAdapter):
-    """DSPy adapter for Qwen 3.5 that keeps the model in its trained
-    distribution across both tool-calling and plain Predict signatures.
+    """DSPy adapter that keeps Qwen 3.5 in its trained distribution for both
+    tool-calling and plain Predict signatures.
 
-    For ReAct signatures (output fields next_thought / next_tool_name /
-    next_tool_args), the adapter takes a custom `format()` path that emits
-    Qwen's canonical `<tool_call><function=...></function></tool_call>`
-    format, replays trajectories with `<tool_response name=...>` wrapping,
-    and parses tool calls out of `message.content` via
-    `split_thought_and_call`. The server's native function-call path is
-    never invoked (`use_native_function_calling=False`).
+    Tool-calling signatures (any signature with a `dspy.ToolCalls` output,
+    including `dspy.ReAct`) get a Qwen-native prompt: tools listed in a
+    <tools> block, past calls replayed as `<tool_call><function=...>` XML,
+    results wrapped in `<tool_response>`, and calls parsed from the visible
+    text. The server's native function-calling path is never used.
 
-    For non-ReAct signatures, the adapter inherits `XMLAdapter`'s
-    `<field>content</field>` protocol — a natural fit for Qwen's XML-heavy
-    training distribution — with the same `<think>` stripping and
-    `reasoning_content` rescue layered on top.
+    Other signatures use `XMLAdapter`'s `<field>content</field>` protocol.
 
-    Defensive behaviors applied to both paths:
-      - `strip_think()` scrubs leaked `<think>...</think>` blocks.
-      - `_call_postprocess()` promotes `reasoning_content` into `text` on
-        turns where the server routed the entire completion into the
-        reasoning side channel.
-      - `strict_parse=False` (default) gracefully finishes a ReAct turn
-        when no tool call is emitted; `strict_parse=True` raises
-        `AdapterParseError` instead.
+    Both paths strip leaked `<think>` blocks and recover completions that the
+    server routed into the reasoning channel. With `strict_parse=False`
+    (default), a tool-calling turn with no call returns an empty `ToolCalls`,
+    which makes ReAct force a final `submit`. With `strict_parse=True` it
+    raises `AdapterParseError` instead.
     """
 
     def __init__(
@@ -158,62 +223,51 @@ class QwenAdapter(XMLAdapter):
         strict_parse: bool = False,
     ):
         super().__init__(callbacks=callbacks)
-        # Hardcode: we never pass tools=[] to the server, regardless of
-        # whether LiteLLM claims the provider supports native function
-        # calling. This is the design contract of the adapter.
+        # The adapter never sends tools to the server, whatever the provider
+        # claims to support.
         self.use_native_function_calling = False
         self.use_json_adapter_fallback = False
         if native_response_types is not None:
             self.native_response_types = native_response_types
         self.strict_parse = strict_parse
 
-    # -------- format() — branch on ReAct vs plain signatures --------
+    # -------- call pipeline --------
+
+    def _call_preprocess(self, lm, lm_kwargs, signature, inputs):
+        tools_field = _tools_field(signature)
+        tools = _as_tool_list(inputs.get(tools_field)) if tools_field else []
+        _ACTIVE_TOOLS.set({t.name: t for t in tools})
+        _FORCED_TOOL.set(_forced_tool_name(lm_kwargs.get("tool_choice")))
+        return super()._call_preprocess(lm, lm_kwargs, signature, inputs)
+
+    def _call_postprocess(self, processed_signature, original_signature, responses):
+        responses = [_rescue_reasoning(r, processed_signature) for r in responses]
+        return super()._call_postprocess(processed_signature, original_signature, responses)
+
+    # -------- format --------
 
     def format(
         self,
         signature: type[Signature],
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        if _is_react_signature(signature):
-            # Custom system prompt optimized for ReAct with Qwen 3.5:
-            # scrubs ReAct's JSON directive from the auto-generated
-            # instructions, emits _REACT_GUIDANCE, optionally wraps any
-            # `tools` input as a <tools> block (usually empty in prod
-            # because ReAct embeds tool enumeration in instructions text).
-            tools = inputs.get("tools") or []
-            tool_list = tools if isinstance(tools, list) else [tools]
-            task_description = _scrub_react_format_directives(
-                signature.instructions or ""
-            )
-            system = build_system_prompt(
-                task_description=task_description,
-                tools=tool_list,
-                react_fields=True,
-            )
-            user = self.format_user_message_content(
-                signature, inputs, main_request=True
-            )
-            # NOTE: Demo trajectories within each demo are pre-formatted strings
-            # (encoded by whatever adapter was active at collection time, not
-            # necessarily Qwen XML). This is a DSPy core limitation tracked in
-            # react.py TOPIC 01 — the package authors are actively working on it.
-            # We still inject demos so instruction-only optimizers work correctly;
-            # trajectory-content fidelity improves once DSPy resolves that issue.
-            messages = [{"role": "system", "content": system}]
-            messages.extend(self.format_demos(signature, demos))
-            messages.append({"role": "user", "content": user})
-            return messages
+    ) -> Prompt:
+        prompt = _ADAPTER_FORMAT(self, signature, demos, inputs)
+        if not _is_tool_signature(signature):
+            return prompt
 
-        # Non-ReAct: delegate to the base Adapter.format composition.
-        # XMLAdapter's XML-tag behavior (field descriptions, structure,
-        # field_with_value) comes from its overridden hooks, which are still
-        # resolved via MRO on `self`. Calling `_ADAPTER_FORMAT` directly
-        # avoids a duplicate callback span that `super().format()` would
-        # emit (see note at top of module).
-        return _ADAPTER_FORMAT(self, signature, demos, inputs)
-
-    # -------- hooks shared between paths --------
+        tools_field = _tools_field(signature)
+        tools = _as_tool_list(inputs.get(tools_field)) if tools_field else []
+        forced = _FORCED_TOOL.get()
+        if forced and any(t.name == forced for t in tools):
+            tools = [t for t in tools if t.name == forced]
+        system = build_system_prompt(
+            task_description=signature.instructions or "",
+            tools=tools,
+            react_fields=True,
+            required_tool=forced if tools and tools[0].name == forced else None,
+        )
+        return Prompt(system=system, messages=_merge_user_turns(prompt.messages))
 
     def format_user_message_content(
         self,
@@ -223,38 +277,24 @@ class QwenAdapter(XMLAdapter):
         suffix: str = "",
         main_request: bool = False,
     ) -> str:
-        # ReAct's _format_trajectory helper calls this with a synthetic
-        # signature whose input fields are trajectory keys (thought_0,
-        # tool_name_0, ...). Render as a Qwen-native transcript.
-        if _is_react_trajectory(inputs):
-            rendered = _render_react_trajectory(inputs)
+        # History replays tool results through a one-field signature.
+        results = inputs.get("tool_call_results")
+        if list(signature.input_fields) == ["tool_call_results"] and results is not None:
+            rendered = _render_tool_responses(ToolCallResults.model_validate(results))
             return (prefix + rendered + suffix).strip()
 
-        # A `tools` input field on a ReAct main-turn request is a list of
-        # Tool objects — skip it so XMLAdapter doesn't try to XML-wrap a
-        # list of Python objects. The tools themselves are already
-        # described in the system message (via build_system_prompt).
-        if "tools" in inputs and "tools" in signature.input_fields:
-            signature = signature.delete("tools")
-            inputs = {k: v for k, v in inputs.items() if k != "tools"}
-
-        # For ReAct signatures, suppress XMLAdapter's "Respond with
-        # `<next_thought>`, `<next_tool_name>`, `<next_tool_args>`" footer.
-        # That footer conflicts with _REACT_GUIDANCE in the system prompt and
-        # causes the model to drift to DSPy-standard XML tags instead of
-        # Qwen-native <tool_call> format.  The system prompt already has the
-        # full format instructions, so the footer is redundant and harmful.
-        if _is_react_signature(signature) and main_request:
+        if _is_tool_signature(signature):
+            # Tools live in the system prompt and history is replayed as
+            # turns, so neither belongs in the user message.
+            for name, field in list(signature.input_fields.items()):
+                if name == _tools_field(signature) or name == "history":
+                    signature = signature.delete(name)
+            inputs = {k: v for k, v in inputs.items() if k in signature.input_fields}
+            if not inputs:
+                return ""
+            # XMLAdapter's "Respond with <field>..." footer contradicts the
+            # tool-call protocol in the system prompt.
             main_request = False
-
-        # ReAct extract step: Qwen-native tool-call XML in the trajectory may
-        # keep the model in tool-calling mode. Append a transition instruction
-        # so it switches to XML field output instead of emitting tool calls.
-        if main_request and "trajectory" in inputs and not _is_react_signature(signature):
-            suffix = (
-                "\n\nThe tool calls above are now complete. "
-                "Respond with the output fields using XML tags — do not make any more tool calls."
-            ) + suffix
 
         return super().format_user_message_content(
             signature, inputs, prefix=prefix, suffix=suffix, main_request=main_request
@@ -266,106 +306,45 @@ class QwenAdapter(XMLAdapter):
         outputs: dict[str, Any],
         missing_field_message: str | None = None,
     ) -> str:
-        if _is_react_signature(signature):
-            thought = outputs.get("next_thought", "")
-            name = outputs.get("next_tool_name", "")
-            args = outputs.get("next_tool_args", {}) or {}
-            call_xml = _render_tool_call(name, args)
-            if thought:
-                return f"{thought}\n{call_xml}"
-            return call_xml
+        if _is_tool_signature(signature):
+            thought_field = _thought_field(signature)
+            thought = outputs.get(thought_field) if thought_field else None
+            raw_calls = outputs.get(_tool_calls_field(signature))
+            calls = ToolCalls.model_validate(raw_calls).tool_calls if raw_calls else []
+            pieces = [str(thought).strip()] if thought else []
+            pieces.extend(_render_tool_call(c.name, c.args or {}) for c in calls)
+            return "\n".join(pieces)
 
-        # XMLAdapter renders outputs as <field>content</field>.
         return super().format_assistant_message_content(
             signature, outputs, missing_field_message=missing_field_message
         )
 
+    # -------- parse --------
+
     def parse(self, signature: type[Signature], completion: str) -> dict[str, Any]:
         cleaned = strip_think(completion)
 
-        if _is_react_signature(signature):
-            thought, call = split_thought_and_call(cleaned)
-            if call is None:
-                if self.strict_parse:
-                    from dspy.utils.exceptions import AdapterParseError
-                    raise AdapterParseError(
-                        adapter_name="QwenAdapter",
-                        signature=signature,
-                        lm_response=completion,
-                        message="No <function=...> tool call found.",
-                    )
-                return {
-                    "next_thought": thought,
-                    "next_tool_name": "finish",
-                    "next_tool_args": {},
-                }
-            name, args = call
-            # finish takes no parameters; the model sometimes tacks on a
-            # <parameter=answer>...</parameter> after multiple prior tool calls
-            # established a parameter pattern in context. Drop them so ReAct's
-            # tool dispatch doesn't raise an argument error.
-            if name == "finish":
-                args = {}
-            return {
-                "next_thought": thought,
-                "next_tool_name": name,
-                "next_tool_args": args,
-            }
+        if not _is_tool_signature(signature):
+            return _XML_PARSE_UNWRAPPED(self, signature, cleaned)
 
-        # Non-ReAct: XMLAdapter parses `<field>content</field>` tags.
-        # Call the unwrapped implementation to avoid a duplicate callback
-        # span (see note at top of module).
-        return _XML_PARSE_UNWRAPPED(self, signature, cleaned)
+        thought, calls = split_thought_and_calls(cleaned)
+        if not calls and self.strict_parse:
+            raise AdapterParseError(
+                adapter_name="QwenAdapter",
+                signature=signature,
+                lm_response=completion,
+                message="No <function=...> tool call found.",
+            )
 
-    def _call_postprocess(
-        self,
-        processed_signature,
-        original_signature,
-        outputs,
-        lm,
-        lm_kwargs,
-    ):
-        """Rescue turns where the reasoning-parser routed content into
-        `reasoning_content` and left `text` incomplete.
+        tools = _ACTIVE_TOOLS.get()
+        decoded = []
+        for name, raw_args in calls:
+            tool = tools.get(name)
+            schemas = (tool.args or {}) if tool else {}
+            args = {k: decode_for_schema(v, schemas.get(k)) for k, v in raw_args.items()}
+            decoded.append({"name": name, "args": args})
 
-        Two failure modes handled:
-
-        1. `text` is empty — the server's reasoning parser consumed the entire
-           completion. Promote `reasoning_content` wholesale so `parse()` has
-           something to work with.
-
-        2. `text` has a thought sentence but no `<function=` tag (ReAct only)
-           — the model emitted the tool call inside its thinking side-channel
-           while only surfacing the thought in `text`. Append `reasoning_content`
-           so `split_thought_and_call` can find the tool call.
-        """
-        normalized = []
-        for output in outputs:
-            if not isinstance(output, dict):
-                normalized.append(output)
-                continue
-            text = output.get("text") or ""
-            reasoning = output.get("reasoning_content") or ""
-            if not text and reasoning:
-                output = {**output, "text": reasoning}
-                logger.debug(
-                    "QwenAdapter: text was empty; promoted reasoning_content "
-                    "(%d chars) into text for parsing.",
-                    len(reasoning),
-                )
-            elif (
-                reasoning
-                and _is_react_signature(processed_signature)
-                and "<function=" not in text
-                and "<function=" in reasoning
-            ):
-                output = {**output, "text": text + "\n" + reasoning}
-                logger.debug(
-                    "QwenAdapter: tool call found only in reasoning_content; "
-                    "appended (%d chars) to text for parsing.",
-                    len(reasoning),
-                )
-            normalized.append(output)
-        return super()._call_postprocess(
-            processed_signature, original_signature, normalized, lm, lm_kwargs
-        )
+        result: dict[str, Any] = {_tool_calls_field(signature): ToolCalls.from_dict_list(decoded)}
+        if thought_field := _thought_field(signature):
+            result[thought_field] = thought
+        return result
